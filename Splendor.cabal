@@ -57,8 +57,10 @@ executable Splendor
   -- other-extensions:
 
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.12 && <4.13
-
+  build-depends:
+      base >=4.12 && <4.13
+      , text >=1.2.3.1
+      , containers >=0.6.0.1
   -- Directories containing source files.
   hs-source-dirs:      src
 
