@@ -4,7 +4,9 @@ module Game.Data.Gems (
   Gems (..),
   Token (..),
   startingBank,
-  startingHand
+  startingHand,
+  singleWild,
+  sumGems
 ) where
 
 import Data.Map (Map)
@@ -36,3 +38,10 @@ initGems gemCount wildCount = Map.fromList (gems ++ wilds)
    where
      wilds = [(Wild Gold, wildCount)]
      gems = zipWith (,) [Gem Red, Gem Blue, Gem Black, Gem Green, Gem White] (repeat gemCount)
+
+singleWild :: Gems
+singleWild = Map.fromList [(Wild Gold, 1)]
+
+sumGems :: Gems -> Int
+sumGems = sum . Map.elems
+
