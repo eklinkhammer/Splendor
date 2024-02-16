@@ -1,4 +1,4 @@
-module Card (
+module Game.Data.Card (
   Card (..)
 ) where
 

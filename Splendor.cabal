@@ -51,7 +51,12 @@ executable Splendor
   main-is:             Main.hs
 
   -- Modules included in this executable, other than Main.
-  -- other-modules:
+  other-modules:
+      Game.Data.Gems,
+      Game.Data.Game,
+      Game.Data.Action,
+      Game.Data.Card,
+      Game.Data.Player
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:

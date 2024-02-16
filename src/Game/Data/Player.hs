@@ -1,13 +1,17 @@
 module Game.Data.Player (
-  Player (..)
+  Player (..),
+  initPlayer
 ) where
 
 import Game.Data.Gems
 import Game.Data.Card
 
 data Player = Player {
-  cards :: [Card],
+  activeCards :: [Card],
   name :: String,
   reservedCards :: [Card],
-  gems :: Gems
+  playerGems :: Gems
 } deriving (Show, Eq)
+
+initPlayer :: String -> Player
+initPlayer name = Player [] name [] startingHand
