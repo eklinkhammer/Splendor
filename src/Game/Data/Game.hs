@@ -19,6 +19,27 @@ data Game = Game {
   bank :: Gems
 } deriving (Show, Eq)
 
+activePlayer :: Game -> Player
+activePlayer = head . players
+
+-- Updates game state. First player is assumed to be active.  
+doAction :: Game -> Action -> Game
+doAction game (Purchase card) = undefined
+doAction game (Reserve card) = undefined
+doAction game (Take gems) = takeGems game gems
+  where
+    player = activePlayer game
+     
+takeGems :: Game -> Gems -> Game
+takeGems game gems = game { bank = updatedBank, players = updatePlayers game updatedPlayer }
+  where
+    updatedBank = Map.unionWith (-) (bank game) gems
+    player = activePlayer game
+    updatedPlayer = player { playerGems = Map.unionWith (+) gems (playerGems player) }
+
+
+updatePlayers :: Game -> Player -> Game
+updatePlayers game playerAfterAction = game { players = (tail $ players game) ++ [playerAfterAction] }
 
 isActionPossible :: Action -> Player -> Game -> Bool
 isActionPossible (Purchase card) player game = canPlayerPurchase card game player
@@ -29,7 +50,19 @@ canPlayerPurchase :: Card -> Game -> Player -> Bool
 canPlayerPurchase card game player = isCardAvailable card game && canPlayerAfford card player
 
 canPlayerAfford :: Card -> Player -> Bool
-canPlayerAfford card player = False
+canPlayerAfford card player = wildsRequiredForPurchase card player <= (playerGems player Map.! (Wild Gold))
+
+payForCard :: Player -> Card -> Player
+payForCard player card = player { playerGems = newGems }
+  where
+    withoutCost = removeCardCost card player
+    noNegatives = Map.map (max 0) withoutCost
+    newGems = Map.adjust (\g -> g - (wildsRequiredForPurchase card player)) (Wild Gold) noNegatives
+removeCardCost :: Card -> Player -> Gems
+removeCardCost card player = Map.unionWith (-) (playerGems player) (cost card)
+
+wildsRequiredForPurchase :: Card -> Player -> Int
+wildsRequiredForPurchase c = sum . Map.elems . Map.filter (\x -> x < 0) . removeCardCost c
 
 canPlayerReserve :: Card -> Game -> Player -> Bool
 canPlayerReserve card game player = isCardAvailable card game && canPlayerTakeGems player singleWild
@@ -61,12 +94,6 @@ doesBankHaveGems game gems = tokensExist && enoughLeft
     enoughLeft = all (\x -> x > 4) $ Map.elems allValuesInBankForDoubles
     allValuesInBankForDoubles = Map.intersection (bank game) gemsChosenMoreThanOnce
     gemsChosenMoreThanOnce = Map.filter (\x -> x > 1) gems
-
-leaveFour :: [Maybe Int] -> Bool
-leaveFour [] = True
-leaveFour (x:xs) = case x of
-  (Just n) -> n >= 4 && leaveFour xs
-  Nothing -> False
 
 allVisible :: Game -> [Card]
 allVisible game = [topDeck game, middleDeck game, bottomDeck game] >>= snd
