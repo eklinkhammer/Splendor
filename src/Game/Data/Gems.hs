@@ -79,4 +79,4 @@ sumGems :: (GemHolder a) => a -> Int
 sumGems = sum . Map.elems . gems
 
 wildCount :: (GemHolder a) => a -> Int
-wildCount a = a Map.! (Wild Gold)
+wildCount a = (gems a) Map.! (Wild Gold) 

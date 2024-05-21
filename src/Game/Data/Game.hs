@@ -19,6 +19,10 @@ data Game = Game {
   bank :: Gems
 } deriving (Show, Eq)
 
+instance GemHolder Game where
+  gems = bank
+  updateGems bank gems = bank { bank = gems }
+
 activePlayer :: Game -> Player
 activePlayer = head . players
 
@@ -31,7 +35,7 @@ doAction game (Take gems) = takeGems game gems
     player = activePlayer game
      
 takeGems :: Game -> Gems -> Game
-takeGems game gems = game { bank = updatedBank, players = updatePlayers game updatedPlayer }
+takeGems game gems = updatePlayers (game { bank = updatedBank }) updatedPlayer
   where
     updatedBank = Map.unionWith (-) (bank game) gems
     player = activePlayer game
@@ -80,18 +84,18 @@ canPlayerTakeGems player gems = isLegalAmountOfGems && playerHasSpace
     takeTwo = noWild && oneDuplicate && count == 2
     takeDifferent = noWild && noDuplicates && count <= 3
     takeWild = oneWild && count == 1
-    oneWild = gems Map.! (Wild Gold) == 1
-    noWild = gems Map.! (Wild Gold) == 0
-    noDuplicates = all (\x -> x == 1 || x == 0) $ Map.elems gems
-    oneDuplicate = True
-    playerHasSpace = sumGems (playerGems player) + count <= 10
+    oneWild = wildCount gems == 1
+    noWild = wildCount gems == 0
+    noDuplicates = allGems (\x -> x == 1 || x == 0) gems
+    oneDuplicate = allGems (\x -> x == 2 || x == 0) gems && sumGems gems == 2
+    playerHasSpace = sumGems player + count <= 10
     count = sumGems gems
    
 doesBankHaveGems :: Game -> Gems -> Bool
 doesBankHaveGems game gems = tokensExist && enoughLeft
   where
-    tokensExist = all (\x -> x >= 0) $ Map.unionWith (-) (bank game) gems
-    enoughLeft = all (\x -> x > 4) $ Map.elems allValuesInBankForDoubles
+    tokensExist = canTake game gems
+    enoughLeft = allGems (\x -> x > 4) allValuesInBankForDoubles
     allValuesInBankForDoubles = Map.intersection (bank game) gemsChosenMoreThanOnce
     gemsChosenMoreThanOnce = Map.filter (\x -> x > 1) gems
 

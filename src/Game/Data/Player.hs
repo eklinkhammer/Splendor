@@ -15,3 +15,7 @@ data Player = Player {
 
 initPlayer :: String -> Player
 initPlayer name = Player [] name [] startingHand
+
+instance GemHolder Player where
+  gems = playerGems
+  updateGems a gems = a { playerGems = gems }
