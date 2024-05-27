@@ -45,6 +45,15 @@ extra-source-files:  CHANGELOG.md, README.md
 -- Constraint on the version of Cabal needed to build this package.
 cabal-version:       >=1.10
 
+library splendor-lib
+    exposed-modules: Game.Data.Gems
+    hs-source-dirs: src
+    build-depends:
+      base >=4.12
+      , text >=1.2.3.1
+      , containers >=0.6.0.1
+ 
+    default-language: Haskell2010
 
 executable Splendor
   -- .hs or .lhs file containing the Main module.
@@ -63,7 +72,7 @@ executable Splendor
 
   -- Other library packages from which modules are imported.
   build-depends:
-      base >=4.12 && <4.13
+      base >=4.12
       , text >=1.2.3.1
       , containers >=0.6.0.1
   -- Directories containing source files.
@@ -72,3 +81,14 @@ executable Splendor
   -- Base language which the package is written in.
   default-language:    Haskell2010
 
+test-suite tests
+    type: exitcode-stdio-1.0
+    main-is: MainTest.hs
+    other-modules:
+      Game.Data.GemsTest
+    build-depends: base >=4.12, HUnit >=1.6, splendor-lib
+      , text >=1.2.3.1
+      , containers >=0.6.0.1
+ 
+    hs-source-dirs: tests
+    default-language: Haskell2010
