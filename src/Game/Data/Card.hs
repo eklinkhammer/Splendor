@@ -9,3 +9,6 @@ data Card = Card {
   value :: Gems,
   point :: Int
 } deriving (Show, Eq)
+
+totalValue :: [Card] -> Gems
+totalValue = foldl (initGems 0 0) . map value

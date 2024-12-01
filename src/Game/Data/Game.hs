@@ -4,6 +4,7 @@ module Game.Data.Game (
 ) where
 
 import Game.Data.Gems
+import Game.Data.GemHolder
 import Game.Data.Card
 import Game.Data.Player
 import Game.Data.Action
@@ -26,6 +27,11 @@ instance GemHolder Game where
 activePlayer :: Game -> Player
 activePlayer = head . players
 
+singlePlayerTurn :: Game -> Action -> Game
+singlePlayerTurn game action = if isLegalAction game action then updatePlayers afterActionGameState
+  where
+    afterActionGameState = doAction game action
+
 -- Updates game state. First player is assumed to be active.  
 doAction :: Game -> Action -> Game
 doAction game (Purchase card) = undefined
@@ -33,7 +39,20 @@ doAction game (Reserve card) = undefined
 doAction game (Take gems) = takeGems game gems
   where
     player = activePlayer game
-     
+
+updatePlayerAndAdvanceActivePlayer :: Game -> Player -> Game
+updatePlayerAndAdvanceActivePlayer game updatedPlayer = game { players = updatedPlayerList }
+  where
+    updatedPlayerList = withoutPlayerWhoJustWent ++ [updatedPlayer]
+    withoutPlayerWhoJustWent = tail (players game)
+
+takeGems :: Game -> Gems -> (Game, Player)
+takeGems game gems = (updatedBank, updatedPlayer)
+  where
+    updatedBank = removeGems game gems
+    updatedPlayer = addGems player gems
+    player = activePlayer game
+
 takeGems :: Game -> Gems -> Game
 takeGems game gems = updatePlayers (game { bank = updatedBank }) updatedPlayer
   where
@@ -53,17 +72,22 @@ isActionPossible (Take gems) player game = playerAbleToMake game gems player
 canPlayerPurchase :: Card -> Game -> Player -> Bool
 canPlayerPurchase card game player = isCardAvailable card game && canPlayerAfford card player
 
-canPlayerAfford :: Card -> Player -> Bool
-canPlayerAfford card player = wildsRequiredForPurchase card player <= (playerGems player Map.! (Wild Gold))
+canPlayerAfford :: Player -> Card -> Bool
+canPlayerAfford player card = case canBuy player (effectiveCostForCard card) of
+  Nothing -> True
+  _ -> True
+
+effectiveCostForCard :: Player -> Card -> Gems
+effectiveCostForCard player card = removeNegatives $ removeGems card (cardBuyingPower player) 
+
+removeNegatives :: Gems -> Gems
+removeNegatives = Map.map (max 0)
 
 payForCard :: Player -> Card -> Player
-payForCard player card = player { playerGems = newGems }
+payForCard player card = removeGems player tokensForPurchase
   where
-    withoutCost = removeCardCost card player
-    noNegatives = Map.map (max 0) withoutCost
-    newGems = Map.adjust (\g -> g - (wildsRequiredForPurchase card player)) (Wild Gold) noNegatives
-removeCardCost :: Card -> Player -> Gems
-removeCardCost card player = Map.unionWith (-) (playerGems player) (cost card)
+    costToPlayer = effectiveCostForCard player card
+    tokensForPurchase = canBuy player costToPlayer
 
 wildsRequiredForPurchase :: Card -> Player -> Int
 wildsRequiredForPurchase c = sum . Map.elems . Map.filter (\x -> x < 0) . removeCardCost c
