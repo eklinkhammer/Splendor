@@ -69,18 +69,26 @@ validateBuyCard gs player source payment = do
     then Left (InvalidPayment "Payment cannot be negative")
     else if not (hasEnoughGems (playerTokens player) payment)
     then Left (InvalidPayment "Player doesn't have these tokens")
-    else if not (hasEnoughGems payment effCost)
-    then Left (CannotAfford (cardId card))
     else
-      -- Validate no overpayment: no token type exceeds the effective cost for that type
-      let payMap = unGemCollection payment
-          overpaid = any (\(tokenType, paid) ->
-            let needed = gemCount effCost tokenType
-            in paid > needed
-            ) (Map.toList payMap)
-      in if overpaid
-         then Left (InvalidPayment "Overpayment: cannot pay more than the effective cost per token type")
-         else Right ()
+      -- Validate payment covers cost: for each color, pay at most what's needed;
+      -- gold covers any shortfall. Total gold paid must equal total shortfall.
+      let colorTypes = [ GemToken c | c <- allGemColors ]
+          -- For each color: shortfall = max 0 (needed - colorPaid)
+          -- colorPaid must not exceed needed
+          checkColor tt =
+            let needed = gemCount effCost tt
+                paid   = gemCount payment tt
+            in if paid > needed
+               then Left (InvalidPayment "Overpayment on a color token")
+               else Right (max 0 (needed - paid))
+      in case mapM checkColor colorTypes of
+           Left err -> Left err
+           Right shortfalls ->
+             let totalShortfall = sum shortfalls
+                 goldPaid = gemCount payment GoldToken
+             in if goldPaid /= totalShortfall
+                then Left (CannotAfford (cardId card))
+                else Right ()
 
 validateReserve :: Player -> Either ActionError ()
 validateReserve player =

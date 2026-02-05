@@ -59,3 +59,4 @@ test-suite splendor-core-test
     hspec       >= 2.10,
     QuickCheck  >= 2.14,
     containers,
+    random      >= 1.2,
