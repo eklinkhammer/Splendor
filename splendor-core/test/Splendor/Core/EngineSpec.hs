@@ -40,7 +40,9 @@ spec = do
         let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
             actions = legalActions gs
             -- Pick the first gem-take action
-            gemAction = head [ a | a@(TakeGems _) <- actions ]
+            gemAction = case [ a | a@(TakeGems _) <- actions ] of
+              (a:_) -> a
+              []    -> error "No gem-take actions in initial state"
             pid = playerId (fromJust (currentPlayer gs))
             result = applyAction gs pid gemAction
         case result of
@@ -52,7 +54,7 @@ spec = do
       it "completes a 2-player random game within 500 turns" $ do
         let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
             gen = mkStdGen 123
-        result <- simulateGame gs gen 500
+            result = simulateGame gs gen 500
         result `shouldSatisfy` \case
           GameOver _ _ -> True
           _            -> False
@@ -60,56 +62,75 @@ spec = do
       it "completes a 3-player random game within 500 turns" $ do
         let gs = initGameState (mkStdGen 77) "test" 3 ["A", "B", "C"]
             gen = mkStdGen 456
-        result <- simulateGame gs gen 500
+            result = simulateGame gs gen 500
         result `shouldSatisfy` \case
           GameOver _ _ -> True
           _            -> False
 
--- | Simulate a game by picking random legal actions until completion or turn limit
-simulateGame :: GameState -> StdGen -> Int -> IO StepResult
-simulateGame gs gen maxTurns = go gs gen maxTurns
+-- | Compute total tokens in the game (bank + all player hands)
+totalTokens :: GameState -> GemCollection
+totalTokens gs =
+  foldl addGems (boardBank (gsBoard gs)) (map playerTokens (gsPlayers gs))
+
+-- | Handle a NeedNobleChoice result by randomly picking a noble
+handleNobleChoice :: GameState -> PlayerId -> [Noble] -> StdGen -> (StepResult, StdGen)
+handleNobleChoice gs pid nobles g =
+  let (nIdx, g') = uniformR (0, length nobles - 1) g
+      noble = nobles !! nIdx
+  in case applyNobleChoice gs pid (nobleId noble) of
+       Advanced gs' -> (Advanced gs', g')
+       GameOver gs' result -> (GameOver gs' result, g')
+       other -> (other, g')
+
+-- | Simulate a game by picking random legal actions until completion or turn limit.
+-- Also checks token conservation after every step.
+simulateGame :: GameState -> StdGen -> Int -> StepResult
+simulateGame gs gen maxTurns =
+  let initialTotal = totalTokens gs
+  in go initialTotal gs gen maxTurns
   where
-    go gs' _ 0 = pure (Advanced gs')  -- Ran out of turns
-    go gs' g n = case gsPhase gs' of
-      Finished result -> pure (GameOver gs' result)
+    go _ gs' _ 0 = Advanced gs'  -- Ran out of turns
+    go initTok gs' g n = case gsPhase gs' of
+      Finished result -> GameOver gs' result
       _ -> case gsTurnPhase gs' of
         MustReturnGems _ ->
           let returns = legalGemReturns gs'
           in if null returns
-             then pure (StepError (OtherError "No legal gem returns"))
-             else do
+             then StepError (OtherError "No legal gem returns")
+             else
                let (idx, g') = uniformR (0, length returns - 1) g
                    ret = returns !! idx
                    pid = playerId (fromJust (currentPlayer gs'))
-               case applyGemReturn gs' pid ret of
-                 Advanced gs'' -> go gs'' g' (n - 1)
-                 NeedGemReturn gs'' _ -> go gs'' g' (n - 1)
-                 NeedNobleChoice gs'' nobles ->
-                   let (nIdx, g'') = uniformR (0, length nobles - 1) g'
-                       noble = nobles !! nIdx
-                   in case applyNobleChoice gs'' pid (nobleId noble) of
-                        Advanced gs''' -> go gs''' g'' (n - 1)
-                        GameOver gs''' result -> pure (GameOver gs''' result)
-                        other -> pure other
-                 GameOver gs'' result -> pure (GameOver gs'' result)
-                 other -> pure other
+               in case applyGemReturn gs' pid ret of
+                    Advanced gs'' -> checkAndContinue initTok gs'' g' n
+                    NeedGemReturn gs'' _ -> checkAndContinue initTok gs'' g' n
+                    NeedNobleChoice gs'' nobles ->
+                      let (result, g'') = handleNobleChoice gs'' pid nobles g'
+                      in case result of
+                           Advanced gs''' -> checkAndContinue initTok gs''' g'' n
+                           other -> other
+                    GameOver gs'' result -> GameOver gs'' result
+                    other -> other
         AwaitingAction ->
           let actions = legalActions gs'
           in if null actions
-             then pure (StepError (OtherError "No legal actions"))
-             else do
+             then StepError (OtherError "No legal actions")
+             else
                let (idx, g') = uniformR (0, length actions - 1) g
                    action = actions !! idx
                    pid = playerId (fromJust (currentPlayer gs'))
-               case applyAction gs' pid action of
-                 Advanced gs'' -> go gs'' g' (n - 1)
-                 NeedGemReturn gs'' _ -> go gs'' g' (n - 1)
-                 NeedNobleChoice gs'' nobles ->
-                   let (nIdx, g'') = uniformR (0, length nobles - 1) g'
-                       noble = nobles !! nIdx
-                   in case applyNobleChoice gs'' pid (nobleId noble) of
-                        Advanced gs''' -> go gs''' g'' (n - 1)
-                        GameOver gs''' result -> pure (GameOver gs''' result)
-                        other -> pure other
-                 GameOver gs'' result -> pure (GameOver gs'' result)
-                 other -> pure other
+               in case applyAction gs' pid action of
+                    Advanced gs'' -> checkAndContinue initTok gs'' g' n
+                    NeedGemReturn gs'' _ -> checkAndContinue initTok gs'' g' n
+                    NeedNobleChoice gs'' nobles ->
+                      let (result, g'') = handleNobleChoice gs'' pid nobles g'
+                      in case result of
+                           Advanced gs''' -> checkAndContinue initTok gs''' g'' n
+                           other -> other
+                    GameOver gs'' result -> GameOver gs'' result
+                    other -> other
+
+    checkAndContinue initTok gs' g n
+      | totalTokens gs' /= initTok =
+          StepError (OtherError "Token conservation violated!")
+      | otherwise = go initTok gs' g (n - 1)
