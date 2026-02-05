@@ -1,0 +1,61 @@
+cabal-version: 3.0
+name:          splendor-core
+version:       0.1.0.0
+synopsis:      Pure game engine for Splendor board game
+license:       MIT
+build-type:    Simple
+
+common shared
+  default-language: GHC2021
+  default-extensions:
+    OverloadedStrings
+    DerivingStrategies
+    DeriveGeneric
+    DeriveAnyClass
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    RecordWildCards
+  ghc-options: -Wall -Wcompat
+
+library
+  import:         shared
+  hs-source-dirs: src
+  exposed-modules:
+    Splendor.Core.Types
+    Splendor.Core.Types.Gem
+    Splendor.Core.Types.Card
+    Splendor.Core.Types.Noble
+    Splendor.Core.Types.Player
+    Splendor.Core.Types.Board
+    Splendor.Core.Types.Action
+    Splendor.Core.Types.GameState
+    Splendor.Core.Rules.ActionValidation
+    Splendor.Core.Rules.GemLogic
+    Splendor.Core.Rules.CardLogic
+    Splendor.Core.Rules.NobleLogic
+    Splendor.Core.Rules.WinCondition
+    Splendor.Core.Engine
+    Splendor.Core.Setup
+    Splendor.Core.CardData
+  build-depends:
+    base       >= 4.17 && < 5,
+    aeson      >= 2.1,
+    containers >= 0.6,
+    text       >= 2.0,
+    random     >= 1.2,
+    vector     >= 0.13,
+
+test-suite splendor-core-test
+  import:         shared
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Spec.hs
+  other-modules:
+    Splendor.Core.Types.GemSpec
+    Splendor.Core.EngineSpec
+  build-depends:
+    base,
+    splendor-core,
+    hspec       >= 2.10,
+    QuickCheck  >= 2.14,
+    containers,

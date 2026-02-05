@@ -1,0 +1,36 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: splendor-server/Dockerfile
+      target: builder
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./splendor-core/src:/build/splendor-core/src
+      - ./splendor-ai/src:/build/splendor-ai/src
+      - ./splendor-server/src:/build/splendor-server/src
+      - ./splendor-server/app:/build/splendor-server/app
+      - splendor-data:/data
+    environment:
+      - SPLENDOR_DB_PATH=/data/splendor.db
+      - SPLENDOR_PORT=8080
+    command: >
+      bash -c "cabal build splendor-server:exe:splendor-server --file-watch &
+               sleep 10 && cabal run splendor-server"
+
+  client:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - client-modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - server
+
+volumes:
+  splendor-data:
+  client-modules:

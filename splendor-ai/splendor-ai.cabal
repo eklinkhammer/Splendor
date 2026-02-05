@@ -1,0 +1,49 @@
+cabal-version: 3.0
+name:          splendor-ai
+version:       0.1.0.0
+synopsis:      AI agents for Splendor board game
+license:       MIT
+build-type:    Simple
+
+common shared
+  default-language: GHC2021
+  default-extensions:
+    OverloadedStrings
+    DerivingStrategies
+    DeriveGeneric
+    DeriveAnyClass
+    GeneralizedNewtypeDeriving
+    LambdaCase
+    RecordWildCards
+  ghc-options: -Wall -Wcompat
+
+library
+  import:         shared
+  hs-source-dirs: src
+  exposed-modules:
+    Splendor.AI.Agent
+    Splendor.AI.Random
+    Splendor.AI.MCTS
+    Splendor.AI.MCTS.Tree
+    Splendor.AI.MCTS.Selection
+    Splendor.AI.MCTS.Expansion
+    Splendor.AI.MCTS.Simulation
+    Splendor.AI.MCTS.Backpropagation
+  build-depends:
+    base          >= 4.17 && < 5,
+    splendor-core,
+    containers    >= 0.6,
+    random        >= 1.2,
+    text          >= 2.0,
+
+test-suite splendor-ai-test
+  import:         shared
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is:        Spec.hs
+  build-depends:
+    base,
+    splendor-ai,
+    splendor-core,
+    hspec       >= 2.10,
+    random,
