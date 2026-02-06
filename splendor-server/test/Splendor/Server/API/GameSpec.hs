@@ -1,12 +1,11 @@
 module Splendor.Server.API.GameSpec (spec) where
 
 import Control.Concurrent.STM (modifyTVar', atomically)
-import Servant (Handler, ServerError(..), (:<|>)(..))
+import Servant (ServerError(..))
 import Servant qualified
 import Test.Hspec
 
 import Splendor.Core.Types
-import Splendor.Server.API.Game (gameServer)
 import Splendor.Server.GameManager (processAction)
 import Splendor.Server.TestHelpers
 import Splendor.Server.Types
@@ -79,17 +78,3 @@ spec = do
       -- The display cards should be visible (4 per tier in standard setup)
       length (publicDisplay (publicTier1 board)) `shouldSatisfy` (> 0)
 
--- ============================================================
--- Handler extraction
--- ============================================================
-
-getGameH :: ServerState -> GameId -> SessionId -> Handler PublicGameView
-getGameH ss = let (h :<|> _) = gameServer ss in h
-
--- | Run a Handler, failing the test on ServerError.
-run :: Handler a -> IO a
-run h = do
-  result <- Servant.runHandler h
-  case result of
-    Right a  -> pure a
-    Left err -> error $ "Handler failed: " ++ show err

@@ -2,15 +2,13 @@ module Splendor.Server.GameplayIntegrationSpec (spec) where
 
 import Control.Concurrent.STM
 import Data.Either (isRight, isLeft)
+import Data.List (elemIndex)
 import Data.Map.Strict qualified as Map
-import Servant (Handler, (:<|>)(..))
-import Servant qualified
 import System.Random (StdGen, newStdGen, uniformR)
 import Test.Hspec
 
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
 import Splendor.Core.Types
-import Splendor.Server.API.Lobby (lobbyServer)
 import Splendor.Server.GameManager
 import Splendor.Server.TestHelpers
 import Splendor.Server.Types
@@ -414,8 +412,13 @@ playTurnsCheckOrder :: ServerState -> GameId -> SessionId -> SessionId
 playTurnsCheckOrder _  _   _  _  _     _     0 = pure ()
 playTurnsCheckOrder ss gid s1 s2 chan1 chan2 n = do
   session <- currentSession ss gid s1 s2
-  result <- processAction ss gid session (TakeGems (TakeDifferent [Ruby, Diamond, Emerald]))
-  result `shouldSatisfy` isRight
+  mg <- lookupGameOrFail ss gid
+  let actions = legalActions (mgGameState mg)
+  case actions of
+    [] -> expectationFailure "No legal actions available"
+    (action:_) -> do
+      result <- processAction ss gid session action
+      result `shouldSatisfy` isRight
   -- Drain both channels and check ordering on the next player's channel
   -- (they receive both GameStateUpdate and ActionRequired)
   nextSession <- currentSession ss gid s1 s2
@@ -423,7 +426,7 @@ playTurnsCheckOrder ss gid s1 s2 chan1 chan2 n = do
   msgs <- drainChan nextChan
   let tags = map msgTag msgs
   -- GameStateUpdate should appear before ActionRequired
-  case (elemIndex' "GameStateUpdate" tags, elemIndex' "ActionRequired" tags) of
+  case (elemIndex "GameStateUpdate" tags, elemIndex "ActionRequired" tags) of
     (Just gsuIdx, Just arIdx) -> gsuIdx `shouldSatisfy` (< arIdx)
     _ -> pure ()  -- If not both present, no ordering to check
   -- Also drain the other channel to clear it
@@ -431,29 +434,3 @@ playTurnsCheckOrder ss gid s1 s2 chan1 chan2 n = do
   _ <- drainChan otherChan
   playTurnsCheckOrder ss gid s1 s2 chan1 chan2 (n - 1)
 
-elemIndex' :: Eq a => a -> [a] -> Maybe Int
-elemIndex' _ [] = Nothing
-elemIndex' x (y:ys)
-  | x == y    = Just 0
-  | otherwise = fmap (+ 1) (elemIndex' x ys)
-
--- ============================================================
--- Lobby handler extraction (same pattern as LobbySpec)
--- ============================================================
-
-createH :: ServerState -> CreateLobbyRequest -> Handler CreateLobbyResponse
-createH ss = let (h :<|> _) = lobbyServer ss in h
-
-joinH :: ServerState -> LobbyId -> JoinLobbyRequest -> Handler JoinLobbyResponse
-joinH ss = let (_ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
-
-startH :: ServerState -> LobbyId -> Handler StartGameResponse
-startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
-
--- | Run a Handler, failing the test on ServerError.
-run :: Handler a -> IO a
-run h = do
-  result <- Servant.runHandler h
-  case result of
-    Right a  -> pure a
-    Left err -> error $ "Handler failed: " ++ show err

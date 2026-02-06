@@ -3,11 +3,11 @@ module Splendor.Server.API.LobbySpec (spec) where
 import Control.Concurrent.STM (readTVarIO)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
-import Servant (Handler, ServerError(..), (:<|>)(..))
+import Servant (ServerError(..))
 import Servant qualified
 import Test.Hspec
+import Splendor.Server.TestHelpers
 import Splendor.Server.Types
-import Splendor.Server.API.Lobby (lobbyServer)
 
 spec :: Spec
 spec = do
@@ -124,29 +124,3 @@ spec = do
           Started _ -> pure ()
           other     -> expectationFailure $ "Expected Started, got: " ++ show other
 
--- ============================================================
--- Handler extraction
--- ============================================================
-
-createH :: ServerState -> CreateLobbyRequest -> Handler CreateLobbyResponse
-createH ss = let (h :<|> _) = lobbyServer ss in h
-
-listH :: ServerState -> Handler [Lobby]
-listH ss = let (_ :<|> h :<|> _) = lobbyServer ss in h
-
-getH :: ServerState -> LobbyId -> Handler Lobby
-getH ss = let (_ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
-
-joinH :: ServerState -> LobbyId -> JoinLobbyRequest -> Handler JoinLobbyResponse
-joinH ss = let (_ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
-
-startH :: ServerState -> LobbyId -> Handler StartGameResponse
-startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
-
--- | Run a Handler, failing the test on ServerError
-run :: Handler a -> IO a
-run h = do
-  result <- Servant.runHandler h
-  case result of
-    Right a  -> pure a
-    Left err -> error $ "Handler failed: " ++ show err

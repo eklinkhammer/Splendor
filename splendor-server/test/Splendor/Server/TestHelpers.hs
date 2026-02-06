@@ -16,11 +16,23 @@ module Splendor.Server.TestHelpers
   , isJustGameStateUpdate
   , isJustActionRequired
   , msgTag
+    -- * Handler helpers
+  , run
+  , createH
+  , listH
+  , getH
+  , joinH
+  , startH
+  , getGameH
   ) where
 
 import Control.Concurrent.STM
 import Data.Map.Strict qualified as Map
+import Servant (Handler, (:<|>)(..))
+import Servant qualified
 import Splendor.Core.Types
+import Splendor.Server.API.Game (gameServer)
+import Splendor.Server.API.Lobby (lobbyServer)
 import Splendor.Server.Types
 import Splendor.Server.GameManager
 
@@ -129,3 +141,33 @@ msgTag (NobleChoiceRequired _)= "NobleChoiceRequired"
 msgTag (GameOverMsg _)        = "GameOverMsg"
 msgTag (ErrorMsg t)           = "ErrorMsg(" ++ show t ++ ")"
 msgTag Pong                   = "Pong"
+
+-- ============================================================
+-- Handler helpers
+-- ============================================================
+
+-- | Run a Handler, failing the test on ServerError.
+run :: Handler a -> IO a
+run h = do
+  result <- Servant.runHandler h
+  case result of
+    Right a  -> pure a
+    Left err -> error $ "Handler failed: " ++ show err
+
+createH :: ServerState -> CreateLobbyRequest -> Handler CreateLobbyResponse
+createH ss = let (h :<|> _) = lobbyServer ss in h
+
+listH :: ServerState -> Handler [Lobby]
+listH ss = let (_ :<|> h :<|> _) = lobbyServer ss in h
+
+getH :: ServerState -> LobbyId -> Handler Lobby
+getH ss = let (_ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
+
+joinH :: ServerState -> LobbyId -> JoinLobbyRequest -> Handler JoinLobbyResponse
+joinH ss = let (_ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
+
+startH :: ServerState -> LobbyId -> Handler StartGameResponse
+startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
+
+getGameH :: ServerState -> GameId -> SessionId -> Handler PublicGameView
+getGameH ss = let (h :<|> _) = gameServer ss in h
