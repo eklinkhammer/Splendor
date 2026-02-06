@@ -238,6 +238,20 @@ spec = do
         AINeedGemReturn _gs _pid -> pure ()
         _ -> expectationFailure "expected AINeedGemReturn"
 
+    it "returns AIWait when currentPlayer is Nothing (invalid index)" $ do
+      (ss, gid, s1, s2) <- setupGame
+      cs <- currentSession ss gid s1 s2
+      tv <- lookupGameTVarOrFail ss gid
+      -- Set gsCurrentPlayer to an out-of-bounds index so currentPlayer returns Nothing
+      atomically $ modifyTVar' tv $ \mg ->
+        let gs = mgGameState mg
+            gs' = gs { gsCurrentPlayer = 99 }
+        in mg { mgGameState = gs' }
+      result <- atomically $ checkTurn ss gid cs
+      case result of
+        AIWait -> pure ()
+        _ -> expectationFailure "expected AIWait for invalid currentPlayer index"
+
     it "returns AINeedNoble when pending nobles exist" $ do
       (ss, gid, s1, s2) <- setupGame
       cs <- currentSession ss gid s1 s2

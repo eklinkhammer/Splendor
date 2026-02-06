@@ -106,6 +106,39 @@ spec = do
           node = newTree gs
       nodeTerminal node `shouldBe` True
 
+    it "MoveNoble with pending noble choice produces valid node" $ do
+      -- Craft a state that triggers NeedNobleChoice, then use the resulting
+      -- game state and noble to test MoveNoble directly.
+      let mkBonusCard :: T.Text -> GemColor -> Card
+          mkBonusCard cid color = Card cid Tier1 emptyGems color 0
+          diamondCards = [mkBonusCard (T.pack $ "d" ++ show i) Diamond | i <- [1..4 :: Int]]
+          rubyCards    = [mkBonusCard (T.pack $ "r" ++ show i) Ruby    | i <- [1..4 :: Int]]
+          noble1 = Noble "noble-d" (Map.fromList [(Diamond, 3)]) 3
+          noble2 = Noble "noble-r" (Map.fromList [(Ruby, 3)]) 3
+      case gsPlayers testGameState of
+        (p:rest) -> do
+          let p' = p { playerPurchased = diamondCards ++ rubyCards }
+              board = gsBoard testGameState
+              board' = board { boardNobles = [noble1, noble2] }
+              gs = testGameState { gsPlayers = p' : rest, gsBoard = board' }
+              -- Expand to find a child that was pre-expanded (NeedNobleChoice path)
+              expanded = expandNode (newTree gs)
+              preExpanded = filter
+                (\c -> nodeExpanded (childNode c) && not (null (nodeChildren (childNode c))))
+                (nodeChildren expanded)
+          case preExpanded of
+            (c:_) -> do
+              -- The child's state is the post-action state awaiting noble choice.
+              -- Its grandchildren are MoveNoble nodes — verify they're valid.
+              let grandchildren = nodeChildren (childNode c)
+              case grandchildren of
+                (gc:_) -> do
+                  nodeTerminal (childNode gc) `shouldBe` False
+                  childMove gc `shouldSatisfy` (\m -> case m of MoveNoble _ -> True; _ -> False)
+                [] -> expectationFailure "expected MoveNoble grandchildren"
+            [] -> expectationFailure "expected pre-expanded children from NeedNobleChoice"
+        [] -> expectationFailure "need players"
+
   describe "expandAt" $ do
     it "empty path expands root" $ do
       let node = newTree testGameState

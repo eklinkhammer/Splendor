@@ -56,6 +56,16 @@ spec = do
     it "returns 0.5 for out-of-bounds index" $
       heuristicScore testGameState 99 `shouldBe` 0.5
 
+    it "returns 0.5 for negative index" $
+      heuristicScore testGameState (-1) `shouldBe` 0.5
+
+    it "returns 1.0 for single player with nonzero prestige" $ do
+      case gsPlayers testGameState of
+        (p:_) -> do
+          let gs = testGameState { gsPlayers = [setPrestige p 5] }
+          heuristicScore gs 0 `shouldBe` 1.0
+        [] -> expectationFailure "need at least one player"
+
   describe "simulate" $ do
     it "returns 1.0 for finished game when perspective player wins" $ do
       let p0 = case gsPlayers testGameState of
@@ -90,6 +100,17 @@ spec = do
       r1 <- simulate node 0
       r2 <- simulate node 0
       r1 `shouldBe` r2
+
+    it "returns value in [0,1] from MustReturnGems phase" $ do
+      let ps = gsPlayers testGameState
+      case ps of
+        (p:rest) -> do
+          let p' = p { playerTokens = GemCollection (Map.fromList [(GemToken Ruby, 6), (GemToken Diamond, 6)]) }
+              gs = testGameState { gsPlayers = p' : rest, gsTurnPhase = MustReturnGems 1 }
+              node = newTree gs
+          result <- simulate node 0
+          result `shouldSatisfy` (\v -> v >= 0 && v <= 1)
+        [] -> expectationFailure "need players"
 
     it "completes within 5 seconds" $ do
       let node = newTree testGameState

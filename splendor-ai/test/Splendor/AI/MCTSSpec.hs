@@ -39,6 +39,12 @@ spec = do
             node = newTree gs
         nodeTerminal node `shouldBe` True
 
+      it "creates non-terminal node for FinalRound phase" $ do
+        let gs = testGameState { gsPhase = FinalRound }
+            node = newTree gs
+        nodeTerminal node `shouldBe` False
+        nodeExpanded node `shouldBe` False
+
     describe "bestChild" $ do
       it "returns Nothing for leaf node" $ do
         bestChild (newTree testGameState) `shouldBe` Nothing
@@ -73,6 +79,10 @@ spec = do
       it "returns True for fresh node" $
         isLeaf (newTree testGameState) `shouldBe` True
 
+      it "returns False for expanded node with children" $ do
+        let node = expandNode (newTree testGameState)
+        isLeaf node `shouldBe` False
+
     describe "nodeAtPath" $ do
       it "returns root for empty path" $ do
         let node = newTree testGameState
@@ -83,6 +93,14 @@ spec = do
       it "returns Nothing for invalid index" $ do
         let node = newTree testGameState
         nodeAtPath node [0] `shouldBe` Nothing
+
+      it "returns valid child at path [0] after expansion" $ do
+        let node = expandNode (newTree testGameState)
+        case nodeAtPath node [0] of
+          Just child -> do
+            -- The child should have a different game state (next player's turn)
+            nodePlayerIdx child `shouldNotBe` nodePlayerIdx node
+          Nothing -> expectationFailure "expected Just for valid path [0]"
 
   describe "Selection" $ do
     describe "ucb1" $ do
@@ -137,6 +155,24 @@ spec = do
               (idx:_) -> idx `shouldBe` 0
               _ -> expectationFailure "expected path of length 2"
           [] -> expectationFailure "expanded node should have children"
+
+      it "picks by UCB1 score when all children are visited" $ do
+        let expanded = expandNode (newTree testGameState)
+            -- Give all children visits, but one with much higher win rate
+            cs = nodeChildren expanded
+            totalVisits = 10 * length cs
+            visitedCs = zipWith (\i c ->
+              c { childNode = (childNode c)
+                    { nodeVisits = 10
+                    , nodeWins = if i == (0 :: Int) then 9.0 else 1.0
+                    }
+                }) [0..] cs
+            node' = expanded { nodeChildren = visitedCs, nodeVisits = totalVisits }
+            path = select 1.414 node'
+        -- Should select child 0 (highest UCB1 due to 9/10 win rate)
+        case path of
+          [idx] -> idx `shouldBe` 0
+          _     -> expectationFailure "expected single-step path"
 
   describe "MCTS integration" $ do
     it "select-expand-simulate-backpropagate cycle updates tree correctly" $ do
@@ -256,6 +292,18 @@ spec = do
             updated = backpropagate 0.7 1 [] node
         nodeWins updated `shouldBe` 0.0
 
+      it "increments visits but not wins for result=0.0 (loss)" $ do
+        let node = expandNode (newTree testGameState)
+            -- perspective=0, node has playerIdx=0, result=0.0 (loss)
+            updated = backpropagate 0.0 0 [0] node
+        nodeVisits updated `shouldBe` 1
+        nodeWins updated `shouldBe` 0.0
+        case nodeChildren updated of
+          (c:_) -> do
+            nodeVisits (childNode c) `shouldBe` 1
+            nodeWins (childNode c) `shouldBe` 0.0
+          [] -> expectationFailure "expected children"
+
       it "propagates through 3-level path, updating all nodes" $ do
         let root = expandNode (newTree testGameState)
         case nodeChildren root of
@@ -372,6 +420,14 @@ spec = do
         let actions = legalActions testGameState
         result <- chooseAction agent testGameState actions
         result `shouldSatisfy` (`elem` actions)
+
+      it "returns singleton action without running MCTS" $ do
+        let actions = legalActions testGameState
+        case actions of
+          (a:_) -> do
+            result <- chooseAction agent testGameState [a]
+            result `shouldBe` a
+          [] -> expectationFailure "expected at least one legal action"
 
     describe "chooseGemReturn" $ do
       it "returns the single option from singleton list" $ do
