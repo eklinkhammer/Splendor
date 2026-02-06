@@ -38,14 +38,3 @@ spec = do
           board = mkTestBoard twoPlayerBank []
           gs = (mkGameState [p1, p2, p3] board) { gsCurrentPlayer = 2 }
       currentPlayer gs `shouldBe` Just p3
-
--- Re-export mkTestBoard from EngineSpec's local helper isn't available,
--- so we duplicate the minimal helper here.
-mkTestBoard :: GemCollection -> [Card] -> Board
-mkTestBoard bank displayCards = Board
-  { boardTier1 = mkTierRow [] displayCards
-  , boardTier2 = mkTierRow [] []
-  , boardTier3 = mkTierRow [] []
-  , boardNobles = []
-  , boardBank = bank
-  }

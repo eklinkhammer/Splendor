@@ -7,6 +7,8 @@ module Splendor.Core.TestHelpers
   , playerWithTokens
   , playerWithCards
   , mkTierRow
+  , mkTestBoard
+  , mkTestBoardWithDeck
   , mkGameState
   , twoPlayerBank
   ) where
@@ -77,6 +79,26 @@ mkGameState players board = GameState
   , gsTurnNumber    = 1
   , gsPhase         = InProgress
   , gsTurnPhase     = AwaitingAction
+  }
+
+-- | Build a Board with a specific bank and tier-1 display cards (other tiers empty)
+mkTestBoard :: GemCollection -> [Card] -> Board
+mkTestBoard bank displayCards = Board
+  { boardTier1 = mkTierRow [] displayCards
+  , boardTier2 = mkTierRow [] []
+  , boardTier3 = mkTierRow [] []
+  , boardNobles = []
+  , boardBank = bank
+  }
+
+-- | Build a Board with a specific bank, tier-1 display cards, and tier-1 deck cards
+mkTestBoardWithDeck :: GemCollection -> [Card] -> [Card] -> Board
+mkTestBoardWithDeck bank displayCards deckCards = Board
+  { boardTier1 = mkTierRow deckCards displayCards
+  , boardTier2 = mkTierRow [] []
+  , boardTier3 = mkTierRow [] []
+  , boardNobles = []
+  , boardBank = bank
   }
 
 -- | Standard 2-player bank: 4 per gem color, 5 gold

@@ -5,25 +5,6 @@ import Splendor.Core.Types
 import Splendor.Core.Rules.ActionValidation
 import Splendor.Core.TestHelpers
 
--- | Helper to make a board with specific bank and display cards
-mkTestBoard :: GemCollection -> [Card] -> Board
-mkTestBoard bank displayCards = Board
-  { boardTier1 = mkTierRow [] displayCards
-  , boardTier2 = mkTierRow [] []
-  , boardTier3 = mkTierRow [] []
-  , boardNobles = []
-  , boardBank = bank
-  }
-
--- | Helper to make a board with deck cards too
-mkTestBoardWithDeck :: GemCollection -> [Card] -> [Card] -> Board
-mkTestBoardWithDeck bank displayCards deckCards = Board
-  { boardTier1 = mkTierRow deckCards displayCards
-  , boardTier2 = mkTierRow [] []
-  , boardTier3 = mkTierRow [] []
-  , boardNobles = []
-  , boardBank = bank
-  }
 
 spec :: Spec
 spec = do

@@ -764,15 +764,6 @@ spec = do
 
 -- ========== Test helpers ==========
 
--- | Helper to make a board with specific bank and display cards
-mkTestBoard :: GemCollection -> [Card] -> Board
-mkTestBoard bank displayCards = Board
-  { boardTier1 = mkTierRow [] displayCards
-  , boardTier2 = mkTierRow [] []
-  , boardTier3 = mkTierRow [] []
-  , boardNobles = []
-  , boardBank = bank
-  }
 
 -- | Compute total tokens in the game (bank + all player hands)
 totalTokens :: GameState -> GemCollection
