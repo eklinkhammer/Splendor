@@ -1,16 +1,21 @@
+{-# OPTIONS_GHC -Wno-x-partial #-}
 module Splendor.Core.EngineSpec (spec) where
 
 import Data.Maybe (fromJust)
+import Data.Text qualified as T
 import System.Random (mkStdGen, uniformR, StdGen)
 import Test.Hspec
+import Test.QuickCheck
 import Splendor.Core.Types
 import Splendor.Core.Engine
 import Splendor.Core.Setup (initGameState)
-import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
+import Splendor.Core.Rules.ActionValidation (validateAction, legalActions, legalGemReturns)
+import Splendor.Core.TestHelpers
 
 spec :: Spec
 spec = do
   describe "Engine" $ do
+    -- ========== Existing tests ==========
     describe "initGameState" $ do
       it "creates a valid 2-player game" $ do
         let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
@@ -39,7 +44,6 @@ spec = do
       it "advances turn after taking gems" $ do
         let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
             actions = legalActions gs
-            -- Pick the first gem-take action
             gemAction = case [ a | a@(TakeGems _) <- actions ] of
               (a:_) -> a
               []    -> error "No gem-take actions in initial state"
@@ -50,6 +54,514 @@ spec = do
           NeedGemReturn _ _ -> pure ()  -- Also valid
           other -> expectationFailure $ "Expected Advanced or NeedGemReturn, got: " ++ show other
 
+    -- ========== New applyAction - TakeGems tests ==========
+    describe "applyAction - TakeGems details" $ do
+      it "bank decremented, player incremented by correct amounts" $ do
+        let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
+            pid = playerId (fromJust (currentPlayer gs))
+            action = TakeGems (TakeDifferent [Ruby, Diamond, Emerald])
+        case applyAction gs pid action of
+          Advanced gs' -> do
+            -- Player 1 (now past, index 0) should have 3 gems
+            let p0 = gsPlayers gs' !! 0
+            gemCount (playerTokens p0) (GemToken Ruby) `shouldBe` 1
+            gemCount (playerTokens p0) (GemToken Diamond) `shouldBe` 1
+            gemCount (playerTokens p0) (GemToken Emerald) `shouldBe` 1
+            -- Bank should be decremented
+            gemCount (boardBank (gsBoard gs')) (GemToken Ruby) `shouldBe` 3
+            gemCount (boardBank (gsBoard gs')) (GemToken Diamond) `shouldBe` 3
+            gemCount (boardBank (gsBoard gs')) (GemToken Emerald) `shouldBe` 3
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "taking to >10 tokens triggers NeedGemReturn" $ do
+        let tokens = mkGems [(GemToken Ruby, 4), (GemToken Diamond, 4)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = mkTestBoard twoPlayerBank []
+            gs = mkGameState [p1, p2] board
+            -- Take 3 more = 11 total, need to return 1
+            action = TakeGems (TakeDifferent [Emerald, Sapphire, Onyx])
+        case applyAction gs "p1" action of
+          NeedGemReturn _ excess -> excess `shouldBe` 1
+          other -> expectationFailure $ "Expected NeedGemReturn, got: " ++ show other
+
+      it "taking to exactly 10 tokens: Advanced" $ do
+        let tokens = mkGems [(GemToken Ruby, 4), (GemToken Diamond, 3)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = mkTestBoard twoPlayerBank []
+            gs = mkGameState [p1, p2] board
+            -- Take 3 more = 10 total, no gem return
+            action = TakeGems (TakeDifferent [Emerald, Sapphire, Onyx])
+        case applyAction gs "p1" action of
+          Advanced _ -> pure ()
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+    -- ========== New applyAction - BuyCard tests ==========
+    describe "applyAction - BuyCard" $ do
+      it "card moves to purchased, removed from display" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 3)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 2)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerPurchased p) `shouldBe` 1
+            cardId (head (playerPurchased p)) `shouldBe` "c1"
+            -- Card removed from display
+            length (tierDisplay (boardTier1 (gsBoard gs'))) `shouldBe` 0
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "payment tokens return to bank" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 3)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 2)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            -- Player had 3 Ruby, paid 2, should have 1
+            let p = gsPlayers gs' !! 0
+            gemCount (playerTokens p) (GemToken Ruby) `shouldBe` 1
+            -- Bank had 4 Ruby (twoPlayerBank), gets 2 back = 6
+            gemCount (boardBank (gsBoard gs')) (GemToken Ruby) `shouldBe` 6
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "display refills from deck after buy" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2)] Diamond 0
+            card2 = mkCard "c2" Tier1 [] Sapphire 0
+            tokens = mkGems [(GemToken Ruby, 3)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [card2] [card1]  -- deck has card2
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 2)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            -- card2 should have moved from deck to display
+            let display = tierDisplay (boardTier1 (gsBoard gs'))
+            length display `shouldBe` 1
+            cardId (head display) `shouldBe` "c2"
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "buy from reserve: card removed from reserve" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 3)]
+            p1 = (playerWithTokens "p1" tokens) { playerReserved = [card1] }
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 2)]
+        case applyAction gs "p1" (BuyCard (FromReserve "c1") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerReserved p) `shouldBe` 0
+            length (playerPurchased p) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "purchase triggering 15+ prestige: enters FinalRound" $ do
+        -- Give player 12 prestige from existing cards, buy a 3-prestige card
+        let existingCards = [ mkCard ("e" <> T.pack (show i)) Tier1 [] Diamond
+                              (if i == 1 then 12 else 0)
+                            | i <- [1..4 :: Int] ]
+            bigCard = mkCard "big" Tier2 [(Ruby, 1)] Emerald 3
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = (playerWithTokens "p1" tokens) { playerPurchased = existingCards }
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] [bigCard]
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "big") payment) of
+          Advanced gs' -> gsPhase gs' `shouldBe` FinalRound
+          GameOver _ _ -> pure ()  -- Also acceptable
+          other -> expectationFailure $ "Expected Advanced with FinalRound or GameOver, got: " ++ show other
+
+    -- ========== New applyAction - ReserveCard tests ==========
+    describe "applyAction - ReserveCard" $ do
+      it "card moves to reserve, display refills" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2)] Diamond 0
+            card2 = mkCard "c2" Tier1 [] Sapphire 0
+            p1 = emptyPlayer "p1"
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [card2] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromDisplay "c1")) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerReserved p) `shouldBe` 1
+            cardId (head (playerReserved p)) `shouldBe` "c1"
+            -- Display should have refilled with card2
+            length (tierDisplay (boardTier1 (gsBoard gs'))) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "gold awarded when available" $ do
+        let p1 = emptyPlayer "p1"
+            p2 = emptyPlayer "p2"
+            card1 = mkCard "c1" Tier1 [] Diamond 0
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank  -- has 5 gold
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromDisplay "c1")) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            gemCount (playerTokens p) GoldToken `shouldBe` 1
+            gemCount (boardBank (gsBoard gs')) GoldToken `shouldBe` 4
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "no gold when bank empty" $ do
+        let p1 = emptyPlayer "p1"
+            p2 = emptyPlayer "p2"
+            card1 = mkCard "c1" Tier1 [] Diamond 0
+            bank = mkGems [(GemToken Ruby, 4), (GemToken Diamond, 4), (GemToken Emerald, 4),
+                           (GemToken Sapphire, 4), (GemToken Onyx, 4)]
+            -- No gold in bank
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = bank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromDisplay "c1")) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            gemCount (playerTokens p) GoldToken `shouldBe` 0
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "reserve from deck: top card removed" $ do
+        let card1 = mkCard "c1" Tier1 [] Diamond 0
+            card2 = mkCard "c2" Tier1 [] Ruby 0
+            p1 = emptyPlayer "p1"
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [card1, card2] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromTopOfDeck Tier1)) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerReserved p) `shouldBe` 1
+            -- Deck should have lost one card
+            length (tierDeck (boardTier1 (gsBoard gs'))) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+    -- ========== applyGemReturn tests ==========
+    describe "applyGemReturn" $ do
+      it "wrong phase: StepError" $ do
+        let tokens = mkGems [(GemToken Ruby, 5)]
+            p1 = playerWithTokens "p1" tokens
+            gs = mkGameState [p1] (mkTestBoard twoPlayerBank [])
+            -- AwaitingAction, not MustReturnGems
+        case applyGemReturn gs "p1" (singleGem (GemToken Ruby) 1) of
+          StepError _ -> pure ()
+          other -> expectationFailure $ "Expected StepError, got: " ++ show other
+
+      it "wrong player: StepError NotYourTurn" $ do
+        let tokens = mkGems [(GemToken Ruby, 6), (GemToken Diamond, 6)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            gs = (mkGameState [p1, p2] (mkTestBoard twoPlayerBank []))
+                   { gsTurnPhase = MustReturnGems 2 }
+        case applyGemReturn gs "p2" (singleGem (GemToken Ruby) 2) of
+          StepError NotYourTurn -> pure ()
+          other -> expectationFailure $ "Expected StepError NotYourTurn, got: " ++ show other
+
+      it "wrong count: StepError" $ do
+        let tokens = mkGems [(GemToken Ruby, 6), (GemToken Diamond, 6)]
+            p1 = playerWithTokens "p1" tokens
+            gs = (mkGameState [p1] (mkTestBoard twoPlayerBank []))
+                   { gsTurnPhase = MustReturnGems 2 }
+        case applyGemReturn gs "p1" (singleGem (GemToken Ruby) 1) of
+          StepError _ -> pure ()
+          other -> expectationFailure $ "Expected StepError, got: " ++ show other
+
+      it "insufficient gems: StepError" $ do
+        let tokens = mkGems [(GemToken Ruby, 6), (GemToken Diamond, 5)]
+            p1 = playerWithTokens "p1" tokens
+            gs = (mkGameState [p1] (mkTestBoard twoPlayerBank []))
+                   { gsTurnPhase = MustReturnGems 1 }
+        case applyGemReturn gs "p1" (singleGem (GemToken Emerald) 1) of
+          StepError _ -> pure ()
+          other -> expectationFailure $ "Expected StepError, got: " ++ show other
+
+      it "valid return: tokens to bank, turn finishes" $ do
+        let tokens = mkGems [(GemToken Ruby, 6), (GemToken Diamond, 6)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            gs = (mkGameState [p1, p2] (mkTestBoard twoPlayerBank []))
+                   { gsTurnPhase = MustReturnGems 2 }
+        case applyGemReturn gs "p1" (mkGems [(GemToken Ruby, 1), (GemToken Diamond, 1)]) of
+          Advanced gs' -> do
+            -- Player should have returned 2 gems
+            let p = gsPlayers gs' !! 0
+            gemCount (playerTokens p) (GemToken Ruby) `shouldBe` 5
+            gemCount (playerTokens p) (GemToken Diamond) `shouldBe` 5
+            -- Turn should advance to player 2
+            gsCurrentPlayer gs' `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+    -- ========== applyNobleChoice tests ==========
+    describe "applyNobleChoice" $ do
+      it "valid choice: noble to player, removed from board" $ do
+        let noble1 = mkNoble "n1" [(Diamond, 3)]
+            noble2 = mkNoble "n2" [(Ruby, 3)]
+            cards = [ mkCard ("d" <> T.pack (show i)) Tier1 [] Diamond 0 | i <- [1..3 :: Int] ]
+            p1 = playerWithCards "p1" cards
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = [noble1, noble2]
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyNobleChoice gs "p1" "n1" of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerNobles p) `shouldBe` 1
+            nobleId (head (playerNobles p)) `shouldBe` "n1"
+            -- Noble removed from board
+            length (boardNobles (gsBoard gs')) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "noble not found: StepError" $ do
+        let p1 = emptyPlayer "p1"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1] board
+        case applyNobleChoice gs "p1" "n99" of
+          StepError _ -> pure ()
+          other -> expectationFailure $ "Expected StepError, got: " ++ show other
+
+      it "wrong player: StepError NotYourTurn" $ do
+        let noble1 = mkNoble "n1" [(Diamond, 3)]
+            p1 = emptyPlayer "p1"
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = [noble1]
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyNobleChoice gs "p2" "n1" of
+          StepError NotYourTurn -> pure ()
+          other -> expectationFailure $ "Expected StepError NotYourTurn, got: " ++ show other
+
+    -- ========== Phase transition tests ==========
+    describe "phase transitions" $ do
+      it "InProgress -> FinalRound on 15+ prestige" $ do
+        let existingCards = [ mkCard ("e" <> T.pack (show i)) Tier1 [] Diamond
+                              (if i == 1 then 12 else 0)
+                            | i <- [1..4 :: Int] ]
+            bigCard = mkCard "big" Tier2 [(Ruby, 1)] Emerald 3
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = (playerWithTokens "p1" tokens) { playerPurchased = existingCards }
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] [bigCard]
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "big") payment) of
+          Advanced gs' -> gsPhase gs' `shouldBe` FinalRound
+          GameOver _ _ -> pure ()  -- Also valid if round completes
+          other -> expectationFailure $ "Expected FinalRound/GameOver, got: " ++ show other
+
+      it "FinalRound -> GameOver when round completes (back to player 0)" $ do
+        -- 2 players. Player 0 triggered final round. Player 1 takes gems.
+        -- Then back to player 0 -> game over.
+        let existingCards = [ mkCard ("e" <> T.pack (show i)) Tier1 [] Diamond
+                              (if i == 1 then 15 else 0)
+                            | i <- [1..4 :: Int] ]
+            p1 = playerWithCards "p1" existingCards
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = (mkGameState [p1, p2] board)
+                   { gsPhase = FinalRound
+                   , gsCurrentPlayer = 1  -- Player 1's turn in final round
+                   }
+            -- Player 1 takes gems
+            action = TakeGems (TakeDifferent [Ruby, Diamond, Emerald])
+        case applyAction gs "p2" action of
+          GameOver _gs' result -> do
+            winnerId result `shouldBe` "p1"
+            finalPrestige result `shouldBe` 15
+          other -> expectationFailure $ "Expected GameOver, got: " ++ show other
+
+      it "FinalRound continues mid-round" $ do
+        -- 3 players. FinalRound, player 0's turn. Should continue to player 1.
+        let existingCards = [ mkCard ("e" <> T.pack (show i)) Tier1 [] Diamond
+                              (if i == 1 then 15 else 0)
+                            | i <- [1..4 :: Int] ]
+            p1 = playerWithCards "p1" existingCards
+            p2 = emptyPlayer "p2"
+            p3 = emptyPlayer "p3"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = mkGems $ [(GemToken c, 5) | c <- allGemColors] ++ [(GoldToken, 5)]
+              }
+            gs = (mkGameState [p1, p2, p3] board)
+                   { gsPhase = FinalRound
+                   , gsCurrentPlayer = 1  -- Player 1's turn mid-round
+                   }
+            action = TakeGems (TakeDifferent [Ruby, Diamond, Emerald])
+        case applyAction gs "p2" action of
+          Advanced gs' -> do
+            gsCurrentPlayer gs' `shouldBe` 2  -- Continues to player 2
+            gsPhase gs' `shouldBe` FinalRound
+          other -> expectationFailure $ "Expected Advanced in FinalRound, got: " ++ show other
+
+    -- ========== Noble auto-visit tests ==========
+    describe "noble auto-visit" $ do
+      it "one eligible noble after buy: auto-assigned" $ do
+        let noble1 = mkNoble "n1" [(Diamond, 3)]
+            -- Player already has 2 Diamond bonuses, buying a Diamond card will give 3
+            existingCards = [ mkCard "d1" Tier1 [] Diamond 0
+                            , mkCard "d2" Tier1 [] Diamond 0
+                            ]
+            -- New Diamond card to buy (cost: 1 Ruby)
+            newCard = mkCard "newD" Tier1 [(Ruby, 1)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = (playerWithTokens "p1" tokens) { playerPurchased = existingCards }
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [newCard]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = [noble1]
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "newD") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerNobles p) `shouldBe` 1
+            nobleId (head (playerNobles p)) `shouldBe` "n1"
+            -- Noble removed from board
+            boardNobles (gsBoard gs') `shouldBe` []
+          other -> expectationFailure $ "Expected Advanced with noble, got: " ++ show other
+
+      it "multiple eligible nobles: NeedNobleChoice" $ do
+        let noble1 = mkNoble "n1" [(Diamond, 3)]
+            noble2 = mkNoble "n2" [(Diamond, 3)]  -- Same requirement
+            existingCards = [ mkCard "d1" Tier1 [] Diamond 0
+                            , mkCard "d2" Tier1 [] Diamond 0
+                            ]
+            newCard = mkCard "newD" Tier1 [(Ruby, 1)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = (playerWithTokens "p1" tokens) { playerPurchased = existingCards }
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [newCard]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = [noble1, noble2]
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "newD") payment) of
+          NeedNobleChoice _ nobles -> length nobles `shouldBe` 2
+          other -> expectationFailure $ "Expected NeedNobleChoice, got: " ++ show other
+
+      it "none eligible: normal advance" $ do
+        let noble1 = mkNoble "n1" [(Ruby, 5)]  -- Requires 5 Ruby bonuses
+            card1 = mkCard "c1" Tier1 [(Ruby, 1)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = [noble1]
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            playerNobles p `shouldBe` []
+            -- Noble still on board
+            length (boardNobles (gsBoard gs')) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced without noble, got: " ++ show other
+
+    -- ========== Full game simulations ==========
     describe "full game simulation" $ do
       it "completes a 2-player random game within 500 turns" $ do
         let gs = initGameState (mkStdGen 42) "test" 2 ["Alice", "Bob"]
@@ -67,6 +579,36 @@ spec = do
           GameOver _ _ -> True
           _            -> False
 
+    -- ========== QuickCheck properties ==========
+    describe "QuickCheck properties" $ do
+      it "token conservation across random game simulation" $ property $ \seed ->
+        let gs = initGameState (mkStdGen seed) "test" 2 ["A", "B"]
+            gen = mkStdGen (seed + 1)
+            initialTotal = totalTokens gs
+        in tokenConserved initialTotal gs gen 200
+
+      it "all legalActions pass validateAction for random initial states" $ property $ \seed ->
+        let gs = initGameState (mkStdGen seed) "test" 2 ["A", "B"]
+            actions = legalActions gs
+            pid = playerId (fromJust (currentPlayer gs))
+        in all (\a -> isRight' (validateAction gs pid a)) actions
+
+-- ========== Test helpers ==========
+
+-- | Helper to make a board with specific bank and display cards
+mkTestBoard :: GemCollection -> [Card] -> Board
+mkTestBoard bank displayCards = Board
+  { boardTier1 = mkTierRow [] displayCards
+  , boardTier2 = mkTierRow [] []
+  , boardTier3 = mkTierRow [] []
+  , boardNobles = []
+  , boardBank = bank
+  }
+
+isRight' :: Either a b -> Bool
+isRight' (Right _) = True
+isRight' _ = False
+
 -- | Compute total tokens in the game (bank + all player hands)
 totalTokens :: GameState -> GemCollection
 totalTokens gs =
@@ -81,6 +623,45 @@ handleNobleChoice gs pid nobles g =
        Advanced gs' -> (Advanced gs', g')
        GameOver gs' result -> (GameOver gs' result, g')
        other -> (other, g')
+
+-- | Check that token conservation holds during a simulation
+tokenConserved :: GemCollection -> GameState -> StdGen -> Int -> Bool
+tokenConserved _ _ _ 0 = True
+tokenConserved initTok gs g n = case gsPhase gs of
+  Finished _ -> True
+  _ -> case gsTurnPhase gs of
+    MustReturnGems _ ->
+      let returns = legalGemReturns gs
+      in if null returns then True
+         else let (idx, g') = uniformR (0, length returns - 1) g
+                  ret = returns !! idx
+                  pid = playerId (fromJust (currentPlayer gs))
+              in case applyGemReturn gs pid ret of
+                   Advanced gs' -> totalTokens gs' == initTok && tokenConserved initTok gs' g' (n - 1)
+                   NeedGemReturn gs' _ -> totalTokens gs' == initTok && tokenConserved initTok gs' g' (n - 1)
+                   NeedNobleChoice gs' nobles ->
+                     let (result, g'') = handleNobleChoice gs' pid nobles g'
+                     in case result of
+                          Advanced gs'' -> totalTokens gs'' == initTok && tokenConserved initTok gs'' g'' (n - 1)
+                          _ -> True
+                   GameOver gs' _ -> totalTokens gs' == initTok
+                   _ -> True
+    AwaitingAction ->
+      let actions = legalActions gs
+      in if null actions then True
+         else let (idx, g') = uniformR (0, length actions - 1) g
+                  action = actions !! idx
+                  pid = playerId (fromJust (currentPlayer gs))
+              in case applyAction gs pid action of
+                   Advanced gs' -> totalTokens gs' == initTok && tokenConserved initTok gs' g' (n - 1)
+                   NeedGemReturn gs' _ -> totalTokens gs' == initTok && tokenConserved initTok gs' g' (n - 1)
+                   NeedNobleChoice gs' nobles ->
+                     let (result, g'') = handleNobleChoice gs' pid nobles g'
+                     in case result of
+                          Advanced gs'' -> totalTokens gs'' == initTok && tokenConserved initTok gs'' g'' (n - 1)
+                          _ -> True
+                   GameOver gs' _ -> totalTokens gs' == initTok
+                   _ -> True
 
 -- | Simulate a game by picking random legal actions until completion or turn limit.
 -- Also checks token conservation after every step.

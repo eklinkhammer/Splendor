@@ -51,12 +51,22 @@ test-suite splendor-core-test
   hs-source-dirs: test
   main-is:        Spec.hs
   other-modules:
+    Splendor.Core.TestHelpers
     Splendor.Core.Types.GemSpec
+    Splendor.Core.Types.PlayerSpec
     Splendor.Core.EngineSpec
+    Splendor.Core.CardDataSpec
+    Splendor.Core.SetupSpec
+    Splendor.Core.Rules.GemLogicSpec
+    Splendor.Core.Rules.CardLogicSpec
+    Splendor.Core.Rules.NobleLogicSpec
+    Splendor.Core.Rules.WinConditionSpec
+    Splendor.Core.Rules.ActionValidationSpec
   build-depends:
     base,
     splendor-core,
     hspec       >= 2.10,
     QuickCheck  >= 2.14,
     containers,
+    text        >= 2.0,
     random      >= 1.2,
