@@ -12,7 +12,7 @@ import Splendor.AI.Agent
 import Splendor.AI.MCTS.Tree
 import Splendor.AI.MCTS.Selection (select)
 import Splendor.AI.MCTS.Expansion (expandAt)
-import Splendor.AI.MCTS.Simulation (simulate)
+import Splendor.AI.MCTS.Simulation (simulateFromState)
 import Splendor.AI.MCTS.Backpropagation (backpropagate)
 
 data MCTSConfig = MCTSConfig
@@ -57,14 +57,10 @@ runMCTS config gs perspectivePlayer = do
             then pure node
             else do
               let path = select (mctsExplorationC config) node
-                  (expanded, _leafState) = expandAt node path
-              -- Get the leaf node for simulation
-              case nodeAtPath expanded path of
-                Nothing -> pure node  -- shouldn't happen; bail
-                Just leafNode -> do
-                  result <- simulate leafNode perspectivePlayer
-                  let updated = backpropagate result perspectivePlayer path expanded
-                  loop updated (iter + 1) startT
+                  (expanded, leafState) = expandAt node path
+              result <- simulateFromState leafState perspectivePlayer
+              let updated = backpropagate result perspectivePlayer path expanded
+              loop updated (iter + 1) startT
 
 instance Agent MCTSAgent where
   agentName :: MCTSAgent -> Text

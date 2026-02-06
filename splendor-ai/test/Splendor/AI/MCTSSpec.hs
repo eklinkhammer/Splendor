@@ -130,10 +130,18 @@ spec = do
             updated = backpropagate 1.0 0 [] node
         nodeWins updated `shouldBe` 1.0
 
-      it "adds (1-result) for opponent's nodes" $ do
+      it "adds 0.0 for non-perspective player's nodes" $ do
         let node = expandNode (newTree testGameState)
             -- perspective=1 but node has playerIdx=0, result=1.0
+            -- perspective-only attribution: non-perspective nodes get 0.0
             updated = backpropagate 1.0 1 [] node
+        nodeWins updated `shouldBe` 0.0
+
+      it "adds 0.0 for non-perspective nodes even with partial result" $ do
+        let node = expandNode (newTree testGameState)
+            -- perspective=1 but node has playerIdx=0, result=0.7 (heuristic)
+            -- Old behavior: 1.0 - 0.7 = 0.3. New: 0.0 (perspective-only)
+            updated = backpropagate 0.7 1 [] node
         nodeWins updated `shouldBe` 0.0
 
   describe "runMCTS" $ do

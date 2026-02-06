@@ -78,17 +78,8 @@ stepResultToNode (NeedNobleChoice gs' nobles) =
   in parentNode { nodeChildren = nobleChildren }
 stepResultToNode (GameOver gs' _result) =
   (newTree gs') { nodeTerminal = True }
-stepResultToNode (StepError _) =
-  -- Should not happen with legal moves; create a terminal dead-end
-  MCTSNode
-    { nodeState     = GameState "error" [] (Board (TierRow [] []) (TierRow [] []) (TierRow [] []) [] emptyGems) 0 0 (Finished (GameResult "" "" 0)) AwaitingAction
-    , nodeVisits    = 0
-    , nodeWins      = 0.0
-    , nodeChildren  = []
-    , nodeExpanded  = True
-    , nodeTerminal  = True
-    , nodePlayerIdx = 0
-    }
+stepResultToNode (StepError err) =
+  error $ "stepResultToNode: StepError from legal move — engine bug: " ++ show err
 
 -- | Helper to create a terminal node from a game state.
 terminalNode :: GameState -> MCTSNode

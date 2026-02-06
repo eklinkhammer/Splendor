@@ -31,6 +31,7 @@ module Splendor.Server.Types
   , newUUID
   ) where
 
+import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (TChan, TVar, newTVarIO)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Map.Strict (Map)
@@ -216,6 +217,7 @@ data ManagedGame = ManagedGame
   , mgConnections   :: Map SessionId (TChan ServerMessage)
   , mgStatus        :: GameStatus
   , mgPendingNobles :: Maybe [Noble]  -- ^ Pending noble choice (survives reconnect)
+  , mgAIThreads    :: [ThreadId]     -- ^ AI player threads for lifecycle management
   }
 
 data ServerState = ServerState

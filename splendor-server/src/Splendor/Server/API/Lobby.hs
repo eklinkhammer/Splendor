@@ -14,7 +14,7 @@ import Data.Time (getCurrentTime)
 import Servant
 
 import Splendor.Server.AIRunner (spawnAIPlayers)
-import Splendor.Server.GameManager (createGame)
+import Splendor.Server.GameManager (createGame, storeAIThreads)
 import Splendor.Server.Types
 
 type LobbyAPI =
@@ -132,8 +132,8 @@ startGameHandler ss lid = do
                              | slot <- aiSlots
                              , Just ps <- [Map.lookup (lsSessionId slot) (mgSessions mg)]
                              ]
-            _ <- spawnAIPlayers ss gameId aiSessions
-            pure ()
+            tids <- spawnAIPlayers ss gameId aiSessions
+            storeAIThreads ss gameId tids
           Nothing -> pure ()  -- shouldn't happen
       liftIO $ atomically $ modifyTVar' (ssLobbies ss) $
         Map.adjust (\l -> l { lobbyStatus = Started gameId }) lid

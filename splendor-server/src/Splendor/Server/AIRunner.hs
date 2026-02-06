@@ -4,6 +4,7 @@ module Splendor.Server.AIRunner
 
 import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Concurrent.STM
+import Control.Exception (SomeException, try)
 import Data.Map.Strict qualified as Map
 
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
@@ -34,19 +35,37 @@ aiLoop ss gid sid = do
         AIWait -> do
           threadDelay aiPollIntervalUs
           go
-        AINeedAction gs _pid actions -> do
-          action <- chooseAction agent gs actions
-          _ <- processAction ss gid sid action
-          -- Small delay between checking again
-          threadDelay aiMoveDelayUs
-          go
-        AINeedGemReturn gs _pid options -> do
-          ret <- chooseGemReturn agent gs options
-          _ <- processGemReturn ss gid sid ret
-          threadDelay aiMoveDelayUs
-          go
+        AINeedAction gs _pid -> do
+          let actions = legalActions gs
+          case actions of
+            [] -> go  -- no legal actions; wait
+            (fallback:_) -> do
+              result <- try @SomeException (chooseAction agent gs actions)
+              action <- case result of
+                Right a -> pure a
+                Left _  -> pure fallback
+              _ <- processAction ss gid sid action
+              threadDelay aiMoveDelayUs
+              go
+        AINeedGemReturn gs _pid -> do
+          let options = legalGemReturns gs
+          case options of
+            [] -> go  -- no options; wait
+            (fallback:_) -> do
+              result <- try @SomeException (chooseGemReturn agent gs options)
+              ret <- case result of
+                Right r -> pure r
+                Left _  -> pure fallback
+              _ <- processGemReturn ss gid sid ret
+              threadDelay aiMoveDelayUs
+              go
         AINeedNoble gs _pid nobles -> do
-          noble <- chooseNoble agent gs nobles
+          result <- try @SomeException (chooseNoble agent gs nobles)
+          noble <- case result of
+            Right n -> pure n
+            Left _  -> case nobles of
+              (n:_) -> pure n
+              []    -> pure (Noble "" mempty 0)  -- shouldn't happen
           _ <- processNobleChoice ss gid sid (nobleId noble)
           threadDelay aiMoveDelayUs
           go
@@ -58,11 +77,13 @@ aiLoop ss gid sid = do
 data AICheck
   = AIFinished
   | AIWait
-  | AINeedAction GameState PlayerId [Action]
-  | AINeedGemReturn GameState PlayerId [GemCollection]
+  | AINeedAction GameState PlayerId
+  | AINeedGemReturn GameState PlayerId
   | AINeedNoble GameState PlayerId [Noble]
 
 -- | Atomically check if it's the AI player's turn and what action is needed.
+--   Legal move computation is deferred to IO (outside the STM transaction)
+--   to minimize transaction hold time.
 checkTurn :: ServerState -> GameId -> SessionId -> STM AICheck
 checkTurn ss gid sid = do
   games <- readTVar (ssGames ss)
@@ -87,11 +108,9 @@ checkTurn ss gid sid = do
                         Nothing ->
                           case gsTurnPhase gs of
                             MustReturnGems _ ->
-                              let returns = legalGemReturns gs
-                              in pure (AINeedGemReturn gs (playerId cp) returns)
+                              pure (AINeedGemReturn gs (playerId cp))
                             AwaitingAction ->
-                              let actions = legalActions gs
-                              in pure (AINeedAction gs (playerId cp) actions)
+                              pure (AINeedAction gs (playerId cp))
 
 -- | Delay before each AI move for UX (500ms).
 aiMoveDelayUs :: Int
