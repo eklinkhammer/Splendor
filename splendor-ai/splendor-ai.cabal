@@ -54,4 +54,5 @@ test-suite splendor-ai-test
     hspec       >= 2.10,
     containers  >= 0.6,
     random,
+    text        >= 2.0,
     time        >= 1.12,

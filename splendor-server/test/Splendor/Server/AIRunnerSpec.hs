@@ -47,6 +47,24 @@ spec = do
         Left _ -> pure ()  -- expected error
         Right _ -> expectationFailure "expected error for full lobby"
 
+    it "rejects adding AI to nonexistent lobby" $ do
+      ss <- newServerState
+      result <- Servant.runHandler (addAIH ss "nonexistent-lobby")
+      case result of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected error for nonexistent lobby"
+
+    it "rejects adding AI after lobby is started" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ addAIH ss lid
+      _ <- run $ startH ss lid
+      result <- Servant.runHandler (addAIH ss lid)
+      case result of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected error for started lobby"
+
   describe "AI game play" $ do
     it "starting game with AI slots spawns AI that makes moves" $ do
       ss <- newServerState
@@ -79,24 +97,6 @@ spec = do
       -- Poll for game completion with timeout
       finished <- waitForGameEnd ss gid 120  -- 120 seconds max
       finished `shouldBe` True
-
-    it "rejects adding AI to nonexistent lobby" $ do
-      ss <- newServerState
-      result <- Servant.runHandler (addAIH ss "nonexistent-lobby")
-      case result of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected error for nonexistent lobby"
-
-    it "rejects adding AI after lobby is started" $ do
-      ss <- newServerState
-      resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
-      let lid = clrLobbyId resp
-      _ <- run $ addAIH ss lid
-      _ <- run $ startH ss lid
-      result <- Servant.runHandler (addAIH ss lid)
-      case result of
-        Left _ -> pure ()
-        Right _ -> expectationFailure "expected error for started lobby"
 
   describe "checkTurn" $ do
     it "returns AIFinished for nonexistent game" $ do

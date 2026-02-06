@@ -1,6 +1,7 @@
 module Splendor.AI.MCTS.ExpansionSpec (spec) where
 
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as T
 import System.Random (mkStdGen)
 import Test.Hspec
 import Splendor.AI.MCTS.Expansion (applyMove, expandAt, expandNode)
@@ -26,11 +27,12 @@ spec = do
 
     it "MoveAction advances to next player" $ do
       let actions = legalActions testGameState
+          currentIdx = gsCurrentPlayer testGameState
       case actions of
         (a:_) -> do
           let node = applyMove (MoveAction a) testGameState
-          -- In a 2-player game, after player 0 acts, it should be player 1's turn
-          nodePlayerIdx node `shouldSatisfy` (\idx -> idx == 0 || idx == 1)
+          -- After acting, it should be the other player's turn
+          nodePlayerIdx node `shouldNotBe` currentIdx
         [] -> expectationFailure "expected legal actions"
 
     it "MoveAction with no currentPlayer produces terminal node" $ do
@@ -63,21 +65,40 @@ spec = do
           node = applyMove (MoveGemReturn ret) gs
       nodeTerminal node `shouldBe` True
 
-    it "action triggering NeedNobleChoice produces pre-expanded node" $ do
-      -- We can verify the NeedNobleChoice path by checking that stepResultToNode
-      -- produces an expanded node with noble children. Instead of crafting a complex
-      -- game state, we test the property: if expandNode produces MoveAction children
-      -- and one of them is pre-expanded, it must have MoveNoble children.
-      let expanded = expandNode (newTree testGameState)
-          preExpandedChildren = filter (\c -> nodeExpanded (childNode c) && not (null (nodeChildren (childNode c)))) (nodeChildren expanded)
-      -- If any pre-expanded children exist, they should have MoveNoble children
-      mapM_ (\c -> do
-        let grandchildren = nodeChildren (childNode c)
-        mapM_ (\gc -> case childMove gc of
-          MoveNoble _ -> pure ()
-          _ -> expectationFailure "pre-expanded child should only have MoveNoble children"
-          ) grandchildren
-        ) preExpandedChildren
+    it "action triggering NeedNobleChoice produces pre-expanded node with MoveNoble children" $ do
+      -- Craft a state where the current player qualifies for 2 nobles after any action.
+      -- Give player 4 Diamond + 4 Ruby bonuses (via purchased cards), place two nobles
+      -- requiring 3 Diamond and 3 Ruby respectively.
+      let mkBonusCard :: T.Text -> GemColor -> Card
+          mkBonusCard cid color = Card cid Tier1 emptyGems color 0
+          diamondCards = [mkBonusCard (T.pack $ "d" ++ show i) Diamond | i <- [1..4 :: Int]]
+          rubyCards    = [mkBonusCard (T.pack $ "r" ++ show i) Ruby    | i <- [1..4 :: Int]]
+          noble1 = Noble "noble-d" (Map.fromList [(Diamond, 3)]) 3
+          noble2 = Noble "noble-r" (Map.fromList [(Ruby, 3)]) 3
+          ps = gsPlayers testGameState
+      case ps of
+        (p:rest) -> do
+          let p' = p { playerPurchased = diamondCards ++ rubyCards }
+              board = gsBoard testGameState
+              board' = board { boardNobles = [noble1, noble2] }
+              gs = testGameState { gsPlayers = p' : rest, gsBoard = board' }
+              expanded = expandNode (newTree gs)
+              -- Some children should be pre-expanded (NeedNobleChoice path)
+              preExpandedChildren = filter
+                (\c -> nodeExpanded (childNode c) && not (null (nodeChildren (childNode c))))
+                (nodeChildren expanded)
+          -- Must have at least one pre-expanded child
+          preExpandedChildren `shouldSatisfy` (not . null)
+          -- All pre-expanded children should only have MoveNoble grandchildren
+          mapM_ (\c -> do
+            let grandchildren = nodeChildren (childNode c)
+            grandchildren `shouldSatisfy` (not . null)
+            mapM_ (\gc -> case childMove gc of
+              MoveNoble _ -> pure ()
+              _ -> expectationFailure "pre-expanded child should only have MoveNoble children"
+              ) grandchildren
+            ) preExpandedChildren
+        [] -> expectationFailure "need players"
 
     it "GameOver result produces terminal node" $ do
       -- Create a state that is finished
