@@ -24,15 +24,33 @@ module Splendor.Server.TestHelpers
   , joinH
   , startH
   , getGameH
+    -- * WAI / HTTP helpers
+  , testApp
+  , testAppWithState
+  , withTestServer
+  , postJSON
+  , getJSON
+  , jsonContentType
   ) where
 
 import Control.Concurrent.STM
+import Data.Aeson (ToJSON, encode)
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as BS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as TE
+import Network.HTTP.Types (Header, hContentType, methodGet, methodPost, parseQuery)
+import Network.Wai (Application, defaultRequest, Request(..))
+import Network.Wai.Handler.Warp qualified as Warp
+import Network.Wai.Test (SResponse, runSession, srequest, SRequest(..))
 import Servant (Handler, (:<|>)(..))
 import Servant qualified
 import Splendor.Core.Types
 import Splendor.Server.API.Game (gameServer)
 import Splendor.Server.API.Lobby (lobbyServer)
+import Splendor.Server.App (mkApp)
 import Splendor.Server.Types
 import Splendor.Server.GameManager
 
@@ -171,3 +189,66 @@ startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
 
 getGameH :: ServerState -> GameId -> SessionId -> Handler PublicGameView
 getGameH ss = let (h :<|> _) = gameServer ss in h
+
+-- ============================================================
+-- WAI / HTTP test helpers
+-- ============================================================
+
+-- | Create a fresh WAI Application for testing.
+testApp :: IO Application
+testApp = snd <$> testAppWithState
+
+-- | Create a fresh WAI Application along with its ServerState.
+testAppWithState :: IO (ServerState, Application)
+testAppWithState = do
+  ss <- newServerState
+  pure (ss, mkApp ss)
+
+-- | Run an action with a test server on an ephemeral port.
+withTestServer :: (Warp.Port -> ServerState -> IO a) -> IO a
+withTestServer action = do
+  ss <- newServerState
+  Warp.testWithApplication (pure (mkApp ss)) (\port -> action port ss)
+
+-- | POST JSON to a path, running the request against an Application.
+postJSON :: ToJSON a => Application -> ByteString -> a -> IO SResponse
+postJSON app path body =
+  runSession (srequest $ SRequest req (encode body)) app
+  where
+    req = defaultRequest
+      { requestMethod = methodPost
+      , rawPathInfo = path
+      , pathInfo = filter (/= "") $ splitPath path
+      , requestHeaders = [jsonContentType]
+      }
+
+-- | GET from a path (which may include query params), running against an Application.
+getJSON :: Application -> ByteString -> IO SResponse
+getJSON app fullPath =
+  runSession (srequest $ SRequest req LBS.empty) app
+  where
+    (rawPath, rawQuery) = splitQueryBS fullPath
+    req = defaultRequest
+      { requestMethod = methodGet
+      , rawPathInfo = rawPath
+      , pathInfo = filter (/= "") $ splitPath rawPath
+      , rawQueryString = rawQuery
+      , queryString = parseQuery rawQuery
+      , requestHeaders = []
+      }
+
+-- | Content-Type: application/json header.
+jsonContentType :: Header
+jsonContentType = (hContentType, "application/json")
+
+-- | Split a ByteString path into segments on '/'.
+splitPath :: ByteString -> [T.Text]
+splitPath bs =
+  let t = TE.decodeUtf8 bs
+  in T.splitOn "/" t
+
+-- | Split a ByteString path?query into (path, querystring including '?')
+splitQueryBS :: ByteString -> (ByteString, ByteString)
+splitQueryBS bs =
+  case BS.break (== 0x3F) bs of  -- 0x3F = '?'
+    (p, q) -> (p, q)

@@ -75,6 +75,9 @@ test-suite splendor-server-test
     Splendor.Server.GameplayIntegrationSpec
     Splendor.Server.API.LobbySpec
     Splendor.Server.API.GameSpec
+    Splendor.Server.API.LobbyHTTPSpec
+    Splendor.Server.API.GameHTTPSpec
+    Splendor.Server.WebSocketSpec
     Splendor.Server.TestHelpers
   build-depends:
     base,
@@ -88,3 +91,9 @@ test-suite splendor-server-test
     text        >= 2.0,
     time        >= 1.12,
     random      >= 1.2,
+    wai         >= 3.2,
+    warp        >= 3.3,
+    wai-extra   >= 3.1,
+    websockets  >= 0.13,
+    http-types  >= 0.12,
+    bytestring  >= 0.11,

@@ -55,6 +55,7 @@ test-suite splendor-core-test
     Splendor.Core.Types.GemSpec
     Splendor.Core.Types.PlayerSpec
     Splendor.Core.EngineSpec
+    Splendor.Core.EngineScenarioSpec
     Splendor.Core.CardDataSpec
     Splendor.Core.SetupSpec
     Splendor.Core.Rules.GemLogicSpec

@@ -1,7 +1,8 @@
 module Splendor.Server.TypesSpec (spec) where
 
 import Control.Concurrent.STM (readTVarIO)
-import Data.Aeson (encode, decode)
+import Data.Aeson (Value(..), encode, decode)
+import Data.Aeson.KeyMap qualified as KM
 import Data.Map.Strict qualified as Map
 import Data.Time (UTCTime(..))
 import Data.Time.Calendar (fromGregorian)
@@ -185,4 +186,92 @@ spec = do
       lobbies `shouldBe` Map.empty
       Map.null games `shouldBe` True
       sessions `shouldBe` Map.empty
+
+  describe "Golden JSON contract (ServerMessage)" $ do
+    let minimalView = PublicGameView
+          { pgvGameId        = "g1"
+          , pgvBoard         = toPublicBoard minimalBoard
+          , pgvPlayers       = []
+          , pgvCurrentPlayer = 0
+          , pgvTurnNumber    = 1
+          , pgvPhase         = InProgress
+          , pgvTurnPhase     = AwaitingAction
+          }
+        minimalBoard = Board
+          { boardTier1  = TierRow [] []
+          , boardTier2  = TierRow [] []
+          , boardTier3  = TierRow [] []
+          , boardNobles = []
+          , boardBank   = emptyGems
+          }
+
+    it "GameStateUpdate has tag and contents with pgvGameId" $ do
+      let msg = GameStateUpdate minimalView
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "GameStateUpdate")
+          case KM.lookup "contents" o of
+            Just (Object contents) ->
+              KM.lookup "pgvGameId" contents `shouldBe` Just (String "g1")
+            _ -> expectationFailure "Expected contents to be an object with pgvGameId"
+        _ -> expectationFailure "Expected JSON object"
+
+    it "ActionRequired has tag and contents as array" $ do
+      let msg = ActionRequired [TakeGems (TakeDifferent [Ruby, Diamond])]
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "ActionRequired")
+          case KM.lookup "contents" o of
+            Just (Array _) -> pure ()
+            _ -> expectationFailure "Expected contents to be an array"
+        _ -> expectationFailure "Expected JSON object"
+
+    it "GemReturnNeeded has tag and contents as array [number, array]" $ do
+      let msg = GemReturnNeeded 2 [singleGem (GemToken Ruby) 1]
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "GemReturnNeeded")
+          case KM.lookup "contents" o of
+            Just (Array arr) -> length arr `shouldBe` 2
+            _ -> expectationFailure "Expected contents to be a 2-element array"
+        _ -> expectationFailure "Expected JSON object"
+
+    it "NobleChoiceRequired has tag and contents as array" $ do
+      let noble = Noble "n1" (Map.fromList [(Diamond, 3)]) 3
+          msg = NobleChoiceRequired [noble]
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "NobleChoiceRequired")
+          case KM.lookup "contents" o of
+            Just (Array arr) -> length arr `shouldBe` 1
+            _ -> expectationFailure "Expected contents to be an array"
+        _ -> expectationFailure "Expected JSON object"
+
+    it "GameOverMsg has tag and contents with winnerId/winnerName/finalPrestige" $ do
+      let result = GameResult "p1" "Alice" 15
+          msg = GameOverMsg result
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "GameOverMsg")
+          case KM.lookup "contents" o of
+            Just (Object contents) -> do
+              KM.lookup "winnerId" contents `shouldBe` Just (String "p1")
+              KM.lookup "winnerName" contents `shouldBe` Just (String "Alice")
+              KM.lookup "finalPrestige" contents `shouldBe` Just (Number 15)
+            _ -> expectationFailure "Expected contents to be an object"
+        _ -> expectationFailure "Expected JSON object"
+
+    it "ErrorMsg has tag and contents as string" $ do
+      let msg = ErrorMsg "something went wrong"
+          json = decode (encode msg) :: Maybe Value
+      case json of
+        Just (Object o) -> do
+          KM.lookup "tag" o `shouldBe` Just (String "ErrorMsg")
+          KM.lookup "contents" o `shouldBe` Just (String "something went wrong")
+        _ -> expectationFailure "Expected JSON object"
 
