@@ -29,7 +29,8 @@ describe('getBuyableCardIds', () => {
     expect(getBuyableCardIds(actions)).toEqual(new Set(['card-r1']));
   });
 
-  it('ignores FromTopOfDeck source', () => {
+  it('ignores BuyCard with non-display/non-reserve source (defensive)', () => {
+    // FromTopOfDeck is not a real BuyCard source from the server, but we test it defensively
     const actions: Action[] = [
       { tag: 'BuyCard', contents: [{ tag: 'FromTopOfDeck', contents: 'Tier1' }, {}] },
     ];

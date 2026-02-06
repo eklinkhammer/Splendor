@@ -177,6 +177,17 @@ describe('gameStore', () => {
       useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
       expect(useGameStore.getState().error).toBeNull();
     });
+
+    it('clears legalActions', () => {
+      const actions: Action[] = [
+        { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond'] } },
+      ];
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
+      expect(useGameStore.getState().legalActions).toHaveLength(1);
+
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
+      expect(useGameStore.getState().legalActions).toEqual([]);
+    });
   });
 
   describe('ActionRequired', () => {
