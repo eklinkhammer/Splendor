@@ -10,8 +10,6 @@ import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text.Encoding qualified as TE
 import Data.Time (getCurrentTime)
-import Data.UUID qualified as UUID
-import Data.UUID.V4 qualified as UUID
 import Servant
 
 import Splendor.Server.GameManager (createGame)
@@ -97,32 +95,28 @@ joinLobbyHandler ss lid req = do
 
 startGameHandler :: ServerState -> LobbyId -> Handler StartGameResponse
 startGameHandler ss lid = do
-  result <- liftIO $ do
-    mLobby <- atomically $ do
-      lobbies <- readTVar (ssLobbies ss)
-      case Map.lookup lid lobbies of
-        Nothing -> pure (Left "Lobby not found")
-        Just lobby ->
-          case lobbyStatus lobby of
-            Waiting
-              | length (lobbySlots lobby) < lobbyMinPlayers lobby ->
-                  pure (Left "Not enough players")
-              | otherwise -> do
-                  pure (Right lobby)
-            _ -> pure (Left "Game already started or lobby closed")
-    case mLobby of
-      Left err -> pure (Left err)
-      Right lobby -> do
-        gameId <- createGame ss (lobbySlots lobby)
-        atomically $ modifyTVar' (ssLobbies ss) $
-          Map.adjust (\l -> l { lobbyStatus = Started gameId }) lid
-        pure (Right gameId)
-  case result of
+  -- Atomically validate and set transitional Starting status to prevent races
+  mLobby <- liftIO $ atomically $ do
+    lobbies <- readTVar (ssLobbies ss)
+    case Map.lookup lid lobbies of
+      Nothing -> pure (Left "Lobby not found")
+      Just lobby ->
+        case lobbyStatus lobby of
+          Waiting
+            | length (lobbySlots lobby) < lobbyMinPlayers lobby ->
+                pure (Left "Not enough players")
+            | otherwise -> do
+                modifyTVar' (ssLobbies ss) $
+                  Map.adjust (\l -> l { lobbyStatus = Starting }) lid
+                pure (Right lobby)
+          _ -> pure (Left "Game already started or lobby closed")
+  case mLobby of
     Left err -> throwError err400 { errBody = encodeUtf8 err }
-    Right gid -> pure StartGameResponse { sgrGameId = gid }
+    Right lobby -> do
+      gameId <- liftIO $ createGame ss (lobbySlots lobby)
+      liftIO $ atomically $ modifyTVar' (ssLobbies ss) $
+        Map.adjust (\l -> l { lobbyStatus = Started gameId }) lid
+      pure StartGameResponse { sgrGameId = gameId }
 
 encodeUtf8 :: Text -> LBS.ByteString
 encodeUtf8 = LBS.fromStrict . TE.encodeUtf8
-
-newUUID :: IO Text
-newUUID = UUID.toText <$> UUID.nextRandom

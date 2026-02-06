@@ -7,14 +7,13 @@ module Splendor.Server.GameManager
   , unregisterConnection
   , lookupGame
   , lookupSession
+  , resolveSession
   ) where
 
 import Control.Concurrent.STM
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.UUID qualified as UUID
-import Data.UUID.V4 qualified as UUID
 import System.Random (newStdGen)
 
 import Splendor.Core.Engine
@@ -39,10 +38,11 @@ createGame ss slots = do
   chans <- mapM (\_ -> newTChanIO) slots
   let chanMap = Map.fromList $ zip (map lsSessionId slots) chans
       mg = ManagedGame
-        { mgGameState   = gs
-        , mgSessions    = sessions
-        , mgConnections = chanMap
-        , mgStatus      = GameActive
+        { mgGameState     = gs
+        , mgSessions      = sessions
+        , mgConnections   = chanMap
+        , mgStatus        = GameActive
+        , mgPendingNobles = Nothing
         }
   gameTVar <- newTVarIO mg
   atomically $ do
@@ -82,27 +82,28 @@ processAction ss gid sid action = do
             case applyAction (mgGameState mg) (psPlayerId ps) action of
               StepError err -> pure (Left (T.pack (show err)))
               Advanced gs' -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 pure (Right ())
               NeedGemReturn gs' n -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
-                sendGemReturnPrompt gameTVar mg' n
+                broadcastGameState mg'
+                sendGemReturnPrompt mg' n
                 pure (Right ())
               NeedNobleChoice gs' nobles -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Just nobles }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
-                sendNobleChoicePrompt gameTVar mg' nobles
+                broadcastGameState mg'
+                sendNobleChoicePrompt mg' nobles
                 pure (Right ())
               GameOver gs' result' -> do
-                let mg' = mg { mgGameState = gs', mgStatus = GameFinished }
+                let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
+                cleanupSessions ss mg'
                 pure (Right ())
   pure result
 
@@ -120,21 +121,22 @@ processGemReturn ss gid sid gems = do
             case applyGemReturn (mgGameState mg) (psPlayerId ps) gems of
               StepError err -> pure (Left (T.pack (show err)))
               Advanced gs' -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 pure (Right ())
               NeedNobleChoice gs' nobles -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Just nobles }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
-                sendNobleChoicePrompt gameTVar mg' nobles
+                broadcastGameState mg'
+                sendNobleChoicePrompt mg' nobles
                 pure (Right ())
               GameOver gs' result' -> do
-                let mg' = mg { mgGameState = gs', mgStatus = GameFinished }
+                let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
+                cleanupSessions ss mg'
                 pure (Right ())
               NeedGemReturn _ _ -> pure (Left "Unexpected NeedGemReturn after gem return")
   pure result
@@ -153,15 +155,16 @@ processNobleChoice ss gid sid nid = do
             case applyNobleChoice (mgGameState mg) (psPlayerId ps) nid of
               StepError err -> pure (Left (T.pack (show err)))
               Advanced gs' -> do
-                let mg' = mg { mgGameState = gs' }
+                let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 pure (Right ())
               GameOver gs' result' -> do
-                let mg' = mg { mgGameState = gs', mgStatus = GameFinished }
+                let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
-                broadcastGameState gameTVar mg'
+                broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
+                cleanupSessions ss mg'
                 pure (Right ())
               NeedGemReturn _ _ -> pure (Left "Unexpected NeedGemReturn after noble choice")
               NeedNobleChoice _ _ -> pure (Left "Unexpected NeedNobleChoice after noble choice")
@@ -208,8 +211,8 @@ resolveSession :: SessionId -> ManagedGame -> Maybe PlayerSession
 resolveSession sid mg = Map.lookup sid (mgSessions mg)
 
 -- | Broadcast personalized game state to each connected player.
-broadcastGameState :: TVar ManagedGame -> ManagedGame -> STM ()
-broadcastGameState _gameTVar mg = do
+broadcastGameState :: ManagedGame -> STM ()
+broadcastGameState mg = do
   let gs = mgGameState mg
   mapM_ (\(sid, chan) ->
     case resolveSession sid mg of
@@ -227,8 +230,8 @@ broadcastGameState _gameTVar mg = do
     ) (Map.toList (mgConnections mg))
 
 -- | Send gem return prompt to the current player.
-sendGemReturnPrompt :: TVar ManagedGame -> ManagedGame -> Int -> STM ()
-sendGemReturnPrompt _gameTVar mg n = do
+sendGemReturnPrompt :: ManagedGame -> Int -> STM ()
+sendGemReturnPrompt mg n = do
   let gs = mgGameState mg
       options = legalGemReturns gs
   case currentPlayer gs of
@@ -242,8 +245,8 @@ sendGemReturnPrompt _gameTVar mg n = do
         ) (Map.toList (mgConnections mg))
 
 -- | Send noble choice prompt to the current player.
-sendNobleChoicePrompt :: TVar ManagedGame -> ManagedGame -> [Noble] -> STM ()
-sendNobleChoicePrompt _gameTVar mg nobles = do
+sendNobleChoicePrompt :: ManagedGame -> [Noble] -> STM ()
+sendNobleChoicePrompt mg nobles = do
   let gs = mgGameState mg
   case currentPlayer gs of
     Nothing -> pure ()
@@ -260,9 +263,9 @@ broadcastMessage :: ManagedGame -> ServerMessage -> STM ()
 broadcastMessage mg msg =
   mapM_ (\chan -> writeTChan chan msg) (Map.elems (mgConnections mg))
 
--- -----------------------------------------------------------------
--- UUID generation
--- -----------------------------------------------------------------
+-- | Remove a game's sessions from the global session map.
+cleanupSessions :: ServerState -> ManagedGame -> STM ()
+cleanupSessions ss mg =
+  modifyTVar' (ssSessions ss) $ \sessions ->
+    foldr Map.delete sessions (Map.keys (mgSessions mg))
 
-newUUID :: IO Text
-newUUID = UUID.toText <$> UUID.nextRandom

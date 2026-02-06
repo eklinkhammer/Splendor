@@ -6,14 +6,15 @@ import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM
 import Control.Exception (finally)
 import Data.Aeson (decode, encode)
-import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Network.WebSockets qualified as WS
 
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
 import Splendor.Core.Types (currentPlayer, playerId, gsTurnPhase, TurnPhase(..))
 
-import Splendor.Server.GameManager
+import Splendor.Server.GameManager (lookupGame, processAction, processGemReturn,
+                                     processNobleChoice, registerConnection,
+                                     unregisterConnection, resolveSession)
 import Splendor.Server.Types
 
 -- | Handle a WebSocket connection for a game.
@@ -26,7 +27,7 @@ handleWebSocket ss gameId sessionId conn = do
     Just gameTVar -> do
       -- Validate session belongs to this game
       mg <- atomically $ readTVar gameTVar
-      case resolveSessionFromMg sessionId mg of
+      case resolveSession sessionId mg of
         Nothing -> WS.sendClose conn ("Invalid session for this game" :: Text)
         Just ps -> do
           -- Register connection and get channel
@@ -41,9 +42,6 @@ handleWebSocket ss gameId sessionId conn = do
             (do killThread senderId
                 atomically $ unregisterConnection gameTVar sessionId)
 
-resolveSessionFromMg :: SessionId -> ManagedGame -> Maybe PlayerSession
-resolveSessionFromMg sid mg = Map.lookup sid (mgSessions mg)
-
 -- | Send the initial game state to a newly connected player.
 sendInitialState :: WS.Connection -> TVar ManagedGame -> PlayerSession -> IO ()
 sendInitialState conn gameTVar ps = do
@@ -51,12 +49,16 @@ sendInitialState conn gameTVar ps = do
   let gs = mgGameState mg
       view = toPublicGameView (psPlayerId ps) gs
   WS.sendTextData conn (encode (GameStateUpdate view))
-  -- If it's this player's turn, send action prompt
+  -- If it's this player's turn, send the appropriate prompt
   case (gsTurnPhase gs, currentPlayer gs) of
     (AwaitingAction, Just cp)
-      | playerId cp == psPlayerId ps -> do
-          let actions = legalActions gs
-          WS.sendTextData conn (encode (ActionRequired actions))
+      | playerId cp == psPlayerId ps ->
+          case mgPendingNobles mg of
+            Just nobles ->
+              WS.sendTextData conn (encode (NobleChoiceRequired nobles))
+            Nothing -> do
+              let actions = legalActions gs
+              WS.sendTextData conn (encode (ActionRequired actions))
     (MustReturnGems n, Just cp)
       | playerId cp == psPlayerId ps -> do
           let options = legalGemReturns gs

@@ -27,6 +27,8 @@ module Splendor.Server.Types
   , ManagedGame(..)
   , ServerState(..)
   , newServerState
+    -- * Utilities
+  , newUUID
   ) where
 
 import Control.Concurrent.STM (TChan, TVar, newTVarIO)
@@ -35,6 +37,8 @@ import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import Data.UUID qualified as UUID
+import Data.UUID.V4 qualified as UUID
 import GHC.Generics (Generic)
 
 import Splendor.Core.Types
@@ -60,6 +64,7 @@ data LobbySlot = LobbySlot
 
 data LobbyStatus
   = Waiting
+  | Starting     -- ^ Transitional: game creation in progress
   | Started GameId
   | Closed
   deriving stock (Eq, Show, Generic)
@@ -206,10 +211,11 @@ data ServerMessage
 -- -----------------------------------------------------------------
 
 data ManagedGame = ManagedGame
-  { mgGameState   :: GameState
-  , mgSessions    :: Map SessionId PlayerSession
-  , mgConnections :: Map SessionId (TChan ServerMessage)
-  , mgStatus      :: GameStatus
+  { mgGameState     :: GameState
+  , mgSessions      :: Map SessionId PlayerSession
+  , mgConnections   :: Map SessionId (TChan ServerMessage)
+  , mgStatus        :: GameStatus
+  , mgPendingNobles :: Maybe [Noble]  -- ^ Pending noble choice (survives reconnect)
   }
 
 data ServerState = ServerState
@@ -223,3 +229,10 @@ newServerState = ServerState
   <$> newTVarIO Map.empty
   <*> newTVarIO Map.empty
   <*> newTVarIO Map.empty
+
+-- -----------------------------------------------------------------
+-- Utilities
+-- -----------------------------------------------------------------
+
+newUUID :: IO Text
+newUUID = UUID.toText <$> UUID.nextRandom
