@@ -2,7 +2,6 @@ module Splendor.Server.AIRunnerSpec (spec) where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM
-import Control.Monad (when)
 import Data.Map.Strict qualified as Map
 import Test.Hspec
 import Servant qualified
@@ -102,28 +101,35 @@ spec = do
       gameResp <- run $ startH ss lid
       let gid = sgrGameId gameResp
           humanSession = clrSessionId resp
-      -- Wait for AI to take its first move if it goes first
-      threadDelay 3000000  -- 3 seconds
-      -- Now make a human move
-      mg <- lookupGameOrFail ss gid
-      let gs = mgGameState mg
-          turnBefore = gsTurnNumber gs
-          actions = legalActions gs
-      case actions of
-        (a:_) -> do
-          result <- processAction ss gid humanSession a
-          case result of
-            Right () -> do
-              -- Wait for AI to respond
-              threadDelay 5000000  -- 5 seconds
-              mg2 <- lookupGameOrFail ss gid
-              gsTurnNumber (mgGameState mg2) `shouldSatisfy` (> turnBefore)
-            Left _ ->
-              -- If it wasn't our turn, the game still progressed via AI
-              gsTurnNumber gs `shouldSatisfy` (> 0)
-        [] ->
-          -- Game might have progressed beyond initial state already
-          gsTurnNumber gs `shouldSatisfy` (>= 0)
+      -- Poll until it's the human player's turn (player 0 = lobby creator)
+      humanReady <- waitForCondition ss gid 150 $ \mg ->
+        let gs = mgGameState mg
+        in case Map.lookup humanSession (mgSessions mg) of
+          Just ps -> case currentPlayer gs of
+            Just cp -> playerId cp == psPlayerId ps
+                       && gsTurnPhase gs == AwaitingAction
+                       && mgStatus mg == GameActive
+            Nothing -> False
+          Nothing -> False
+      case humanReady of
+        Nothing -> expectationFailure "timed out waiting for human's turn"
+        Just mg -> do
+          let gs = mgGameState mg
+              turnBefore = gsTurnNumber gs
+              actions = legalActions gs
+          case actions of
+            (a:_) -> do
+              result <- processAction ss gid humanSession a
+              case result of
+                Right () -> do
+                  -- Poll until turn number advances (AI responded)
+                  advanced <- waitForCondition ss gid 150 $ \mg2 ->
+                    gsTurnNumber (mgGameState mg2) > turnBefore
+                  case advanced of
+                    Just mg2 -> gsTurnNumber (mgGameState mg2) `shouldSatisfy` (> turnBefore)
+                    Nothing -> expectationFailure "timed out waiting for AI to respond"
+                Left err -> expectationFailure $ "human move rejected: " ++ show err
+            [] -> expectationFailure "expected legal actions for human"
 
     it "human player receives broadcasts when AI acts" $ do
       ss <- newServerState
@@ -136,21 +142,21 @@ spec = do
       -- Register a TChan for the human player immediately after game start
       tv <- lookupGameTVarOrFail ss gid
       chan <- atomically $ registerConnection tv humanSession
-      -- If human (player 0) goes first, make a move so AI can respond
+      -- If human goes first, make a move so AI can respond
       mg <- lookupGameOrFail ss gid
       let gs = mgGameState mg
-      when (gsCurrentPlayer gs == 0) $ do
-        let actions = legalActions gs
-        case actions of
-          (a:_) -> do
-            _ <- processAction ss gid humanSession a
-            pure ()
-          [] -> pure ()
-      -- Wait for AI to act and broadcast
-      threadDelay 5000000  -- 5 seconds
-      msgs <- drainChan chan
-      let hasGameStateUpdate = any isGameState msgs
-      hasGameStateUpdate `shouldBe` True
+      case Map.lookup humanSession (mgSessions mg) of
+        Just ps | maybe False (\cp -> playerId cp == psPlayerId ps) (currentPlayer gs) -> do
+          let actions = legalActions gs
+          case actions of
+            (a:_) -> do
+              _ <- processAction ss gid humanSession a
+              pure ()
+            [] -> pure ()
+        _ -> pure ()
+      -- Poll channel until a GameStateUpdate arrives (100ms intervals, 15s timeout)
+      gotBroadcast <- waitForChanMsg chan 150 isGameState
+      gotBroadcast `shouldBe` True
 
     it "AI-only game (2 AI) plays to completion within timeout" $ do
       ss <- newServerState
@@ -242,7 +248,9 @@ spec = do
       case result of
         AINeedNoble _gs _pid nobles -> do
           length nobles `shouldBe` 1
-          nobleId (head nobles) `shouldBe` "n1"
+          case nobles of
+            (n:_) -> nobleId n `shouldBe` "n1"
+            []    -> expectationFailure "expected at least one noble"
         _ -> expectationFailure "expected AINeedNoble"
 
 -- | Wait for a game to end, polling every second. Returns True if finished within timeout.
@@ -254,6 +262,27 @@ waitForGameEnd ss gid remaining = do
   case mgStatus mg of
     GameFinished -> pure True
     GameActive -> waitForGameEnd ss gid (remaining - 1)
+
+-- | Poll game state every 100ms until predicate holds. Returns Nothing on timeout.
+waitForCondition :: ServerState -> GameId -> Int -> (ManagedGame -> Bool) -> IO (Maybe ManagedGame)
+waitForCondition _ _ 0 _ = pure Nothing
+waitForCondition ss gid remaining predicate = do
+  threadDelay 100000  -- 100ms
+  mg <- lookupGameOrFail ss gid
+  if predicate mg
+    then pure (Just mg)
+    else waitForCondition ss gid (remaining - 1) predicate
+
+-- | Poll a TChan every 100ms until a message matching the predicate arrives. Returns True if found.
+waitForChanMsg :: TChan ServerMessage -> Int -> (ServerMessage -> Bool) -> IO Bool
+waitForChanMsg _ 0 _ = pure False
+waitForChanMsg chan remaining predicate = do
+  msgs <- drainChan chan
+  if any predicate msgs
+    then pure True
+    else do
+      threadDelay 100000  -- 100ms
+      waitForChanMsg chan (remaining - 1) predicate
 
 -- | Check if a ServerMessage is a GameStateUpdate.
 isGameState :: ServerMessage -> Bool

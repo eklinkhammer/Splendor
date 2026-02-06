@@ -1,6 +1,7 @@
 module Splendor.AI.MCTSSpec (spec) where
 
 import Data.Map.Strict qualified as Map
+import Data.Text qualified as T
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import System.Random (StdGen, mkStdGen)
 import Test.Hspec
@@ -152,22 +153,31 @@ spec = do
         Nothing -> expectationFailure "expected node at path"
 
     it "expansion auto-creates noble choice children for NeedNobleChoice" $ do
-      -- Expand root and find a BuyCard child
-      let root = expandNode (newTree testGameState)
-          buyChildren = filter isBuyCardMove (nodeChildren root)
-      -- Among buy children, find one whose childNode is pre-expanded (NeedNobleChoice)
-      -- This may not occur in the initial game state, so we verify structurally:
-      -- any childNode that is pre-expanded with MoveNoble children
-      let noblePreExpanded = filter
-            (\c -> nodeExpanded (childNode c) && any isNobleMove (nodeChildren (childNode c)))
-            buyChildren
-      -- If there happen to be noble-triggering buys, verify them; otherwise this is vacuously true
-      -- which is acceptable since the game state may not trigger noble visits
-      mapM_ (\c -> do
-        let grandchildren = nodeChildren (childNode c)
-        grandchildren `shouldSatisfy` (not . null)
-        mapM_ (\gc -> childMove gc `shouldSatisfy` isNobleMove') grandchildren
-        ) noblePreExpanded
+      -- Craft a state where the current player qualifies for 2 nobles after any action.
+      let mkBonusCard :: T.Text -> GemColor -> Card
+          mkBonusCard cid color = Card cid Tier1 emptyGems color 0
+          diamondCards = [mkBonusCard (T.pack $ "d" ++ show i) Diamond | i <- [1..4 :: Int]]
+          rubyCards    = [mkBonusCard (T.pack $ "r" ++ show i) Ruby    | i <- [1..4 :: Int]]
+          noble1 = Noble "noble-d" (Map.fromList [(Diamond, 3)]) 3
+          noble2 = Noble "noble-r" (Map.fromList [(Ruby, 3)]) 3
+      case gsPlayers testGameState of
+        (p:rest) -> do
+          let p' = p { playerPurchased = diamondCards ++ rubyCards }
+              board = gsBoard testGameState
+              board' = board { boardNobles = [noble1, noble2] }
+              gs = testGameState { gsPlayers = p' : rest, gsBoard = board' }
+              expanded = expandNode (newTree gs)
+              preExpandedChildren = filter
+                (\c -> nodeExpanded (childNode c) && not (null (nodeChildren (childNode c))))
+                (nodeChildren expanded)
+          -- Must have at least one pre-expanded child with MoveNoble grandchildren
+          preExpandedChildren `shouldSatisfy` (not . null)
+          mapM_ (\c -> do
+            let grandchildren = nodeChildren (childNode c)
+            grandchildren `shouldSatisfy` (not . null)
+            mapM_ (\gc -> childMove gc `shouldSatisfy` isNobleMove') grandchildren
+            ) preExpandedChildren
+        [] -> expectationFailure "need players"
 
     it "terminal node stops selection and expansion, backprop records result" $ do
       let gs = testGameState { gsPhase = Finished (GameResult "player-1" "Alice" 15) }
@@ -420,8 +430,9 @@ spec = do
 playGameDebug :: MCTSAgent -> RandomAgent -> StdGen -> IO (Maybe Bool, Maybe String)
 playGameDebug mcts rand gen = do
   let gs = initGameState gen "test-game" 2 ["MCTS", "Random"]
-      player0Id = playerId (gsPlayers gs !! 0)
-  loopD gs player0Id 0
+  case gsPlayers gs of
+    (p0:_) -> loopD gs (playerId p0) 0
+    []     -> pure (Nothing, Just "no players in initial game state")
   where
     loopD :: GameState -> PlayerId -> Int -> IO (Maybe Bool, Maybe String)
     loopD gs player0Id depth
@@ -484,16 +495,6 @@ isPlayer0WinByPrestige players p0id =
                              (p:_) -> playerPrestige p
                              []    -> 0
           in p0Prestige == maxPrestige && maxPrestige > 0
-
--- | Check if a child's move is a BuyCard action.
-isBuyCardMove :: MCTSChild -> Bool
-isBuyCardMove (MCTSChild (MoveAction (BuyCard _ _)) _) = True
-isBuyCardMove _ = False
-
--- | Check if a child is a MoveNoble child (for filtering).
-isNobleMove :: MCTSChild -> Bool
-isNobleMove (MCTSChild (MoveNoble _) _) = True
-isNobleMove _ = False
 
 -- | Check if a Move is a MoveNoble (for shouldSatisfy).
 isNobleMove' :: Move -> Bool
