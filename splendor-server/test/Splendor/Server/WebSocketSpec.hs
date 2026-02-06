@@ -1,7 +1,7 @@
 module Splendor.Server.WebSocketSpec (spec) where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (try, SomeException)
+import Control.Exception (try)
 import Data.Aeson (decode, encode)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Text qualified as T
@@ -154,8 +154,8 @@ spec = describe "WebSocket protocol" $ do
           _ <- recvMsg conn
           pure ()
       case result of
-        Left (_ :: SomeException) -> pure ()  -- Connection rejected
-        Right () -> pure ()  -- Or closed gracefully
+        Left (_ :: WS.HandshakeException) -> pure ()  -- Connection rejected as expected
+        Right () -> expectationFailure "Expected connection to be rejected, but it was accepted"
 
   it "invalid gameId is rejected" $ do
     (ss, _gid, s1, _s2) <- setupGame
@@ -166,8 +166,8 @@ spec = describe "WebSocket protocol" $ do
           _ <- recvMsg conn
           pure ()
       case result of
-        Left (_ :: SomeException) -> pure ()
-        Right () -> pure ()
+        Left (_ :: WS.HandshakeException) -> pure ()  -- Connection rejected as expected
+        Right () -> expectationFailure "Expected connection to be rejected, but it was accepted"
 
   it "two clients: action triggers cross-client broadcast" $
     withGameWS $ \port ss gid s1 s2 -> do
@@ -282,7 +282,7 @@ playUntilGameOver ss gid s1 s2 conn1 conn2 remaining = do
 -- | Drain available WS messages (non-blocking) to avoid message backup.
 drainWS :: WS.Connection -> IO ()
 drainWS conn = do
-  mMsg <- timeout 200000 (WS.receiveData conn :: IO LBS.ByteString)
+  mMsg <- timeout 50000 (WS.receiveData conn :: IO LBS.ByteString)
   case mMsg of
     Just _ -> drainWS conn  -- Keep draining
     Nothing -> pure ()

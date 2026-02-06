@@ -349,7 +349,12 @@ simulateServerGame ss gid sessions gen0 maxTurns = go gen0 maxTurns
             AwaitingAction -> do
               let actions = legalActions gs
               case actions of
-                [] -> expectationFailure "No legal actions available"
+                [] -> do
+                  -- Game may have finished between our read and now (TOCTOU)
+                  mg' <- readTVarIO gameTVar
+                  case mgStatus mg' of
+                    GameFinished -> pure ()
+                    _ -> expectationFailure "No legal actions available"
                 _ -> do
                   let (idx, g') = uniformR (0, length actions - 1) g
                       action = actions !! idx
