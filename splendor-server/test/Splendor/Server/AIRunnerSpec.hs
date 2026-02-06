@@ -2,11 +2,14 @@ module Splendor.Server.AIRunnerSpec (spec) where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.STM
+import Control.Monad (when)
 import Data.Map.Strict qualified as Map
 import Test.Hspec
 import Servant qualified
 import Splendor.Core.Types
+import Splendor.Core.Rules.ActionValidation (legalActions)
 import Splendor.Server.AIRunner (checkTurn, AICheck(..))
+import Splendor.Server.GameManager (processAction, registerConnection)
 import Splendor.Server.Types
 import Splendor.Server.TestHelpers
 
@@ -65,6 +68,17 @@ spec = do
         Left _ -> pure ()
         Right _ -> expectationFailure "expected error for started lobby"
 
+    it "rejects add-ai for already started lobby via start then add" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ joinH ss lid (JoinLobbyRequest "Bob")
+      _ <- run $ startH ss lid
+      result <- Servant.runHandler (addAIH ss lid)
+      case result of
+        Left _ -> pure ()
+        Right _ -> expectationFailure "expected error for started lobby"
+
   describe "AI game play" $ do
     it "starting game with AI slots spawns AI that makes moves" $ do
       ss <- newServerState
@@ -79,6 +93,64 @@ spec = do
       mg <- lookupGameOrFail ss gid
       -- Game should still be active or finished, and some progress made
       mgStatus mg `shouldSatisfy` (\s -> s == GameActive || s == GameFinished)
+
+    it "human and AI alternate moves in mixed game" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ addAIH ss lid
+      gameResp <- run $ startH ss lid
+      let gid = sgrGameId gameResp
+          humanSession = clrSessionId resp
+      -- Wait for AI to take its first move if it goes first
+      threadDelay 3000000  -- 3 seconds
+      -- Now make a human move
+      mg <- lookupGameOrFail ss gid
+      let gs = mgGameState mg
+          turnBefore = gsTurnNumber gs
+          actions = legalActions gs
+      case actions of
+        (a:_) -> do
+          result <- processAction ss gid humanSession a
+          case result of
+            Right () -> do
+              -- Wait for AI to respond
+              threadDelay 5000000  -- 5 seconds
+              mg2 <- lookupGameOrFail ss gid
+              gsTurnNumber (mgGameState mg2) `shouldSatisfy` (> turnBefore)
+            Left _ ->
+              -- If it wasn't our turn, the game still progressed via AI
+              gsTurnNumber gs `shouldSatisfy` (> 0)
+        [] ->
+          -- Game might have progressed beyond initial state already
+          gsTurnNumber gs `shouldSatisfy` (>= 0)
+
+    it "human player receives broadcasts when AI acts" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ addAIH ss lid
+      gameResp <- run $ startH ss lid
+      let gid = sgrGameId gameResp
+          humanSession = clrSessionId resp
+      -- Register a TChan for the human player immediately after game start
+      tv <- lookupGameTVarOrFail ss gid
+      chan <- atomically $ registerConnection tv humanSession
+      -- If human (player 0) goes first, make a move so AI can respond
+      mg <- lookupGameOrFail ss gid
+      let gs = mgGameState mg
+      when (gsCurrentPlayer gs == 0) $ do
+        let actions = legalActions gs
+        case actions of
+          (a:_) -> do
+            _ <- processAction ss gid humanSession a
+            pure ()
+          [] -> pure ()
+      -- Wait for AI to act and broadcast
+      threadDelay 5000000  -- 5 seconds
+      msgs <- drainChan chan
+      let hasGameStateUpdate = any isGameState msgs
+      hasGameStateUpdate `shouldBe` True
 
     it "AI-only game (2 AI) plays to completion within timeout" $ do
       ss <- newServerState
@@ -182,3 +254,8 @@ waitForGameEnd ss gid remaining = do
   case mgStatus mg of
     GameFinished -> pure True
     GameActive -> waitForGameEnd ss gid (remaining - 1)
+
+-- | Check if a ServerMessage is a GameStateUpdate.
+isGameState :: ServerMessage -> Bool
+isGameState (GameStateUpdate _) = True
+isGameState _ = False

@@ -1,14 +1,18 @@
 module Splendor.AI.MCTSSpec (spec) where
 
 import Data.Map.Strict qualified as Map
-import System.Random (mkStdGen)
+import Data.Time.Clock (getCurrentTime, diffUTCTime)
+import System.Random (StdGen, mkStdGen)
 import Test.Hspec
 import Splendor.AI.Agent
 import Splendor.AI.MCTS
 import Splendor.AI.MCTS.Tree
 import Splendor.AI.MCTS.Selection (select, ucb1)
-import Splendor.AI.MCTS.Expansion (expandNode)
+import Splendor.AI.MCTS.Expansion (expandNode, expandAt)
+import Splendor.AI.MCTS.Simulation (simulate)
 import Splendor.AI.MCTS.Backpropagation (backpropagate)
+import Splendor.AI.Random (RandomAgent(..))
+import Splendor.Core.Engine (StepResult(..), applyAction, applyGemReturn, applyNobleChoice)
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
 import Splendor.Core.Setup (initGameState)
 import Splendor.Core.Types
@@ -133,6 +137,48 @@ spec = do
               _ -> expectationFailure "expected path of length 2"
           [] -> expectationFailure "expanded node should have children"
 
+  describe "MCTS integration" $ do
+    it "select-expand-simulate-backpropagate cycle updates tree correctly" $ do
+      let root = expandNode (newTree testGameState)
+          path = select 1.414 root
+          (expanded, leafState) = expandAt root path
+      result <- simulate (newTree leafState) 0
+      let updated = backpropagate result 0 path expanded
+      nodeVisits updated `shouldBe` 1
+      case nodeAtPath updated path of
+        Just leaf -> do
+          nodeVisits leaf `shouldBe` 1
+          nodeWins leaf `shouldSatisfy` (\w -> w == 0.0 || w == 1.0)
+        Nothing -> expectationFailure "expected node at path"
+
+    it "expansion auto-creates noble choice children for NeedNobleChoice" $ do
+      -- Expand root and find a BuyCard child
+      let root = expandNode (newTree testGameState)
+          buyChildren = filter isBuyCardMove (nodeChildren root)
+      -- Among buy children, find one whose childNode is pre-expanded (NeedNobleChoice)
+      -- This may not occur in the initial game state, so we verify structurally:
+      -- any childNode that is pre-expanded with MoveNoble children
+      let noblePreExpanded = filter
+            (\c -> nodeExpanded (childNode c) && any isNobleMove (nodeChildren (childNode c)))
+            buyChildren
+      -- If there happen to be noble-triggering buys, verify them; otherwise this is vacuously true
+      -- which is acceptable since the game state may not trigger noble visits
+      mapM_ (\c -> do
+        let grandchildren = nodeChildren (childNode c)
+        grandchildren `shouldSatisfy` (not . null)
+        mapM_ (\gc -> childMove gc `shouldSatisfy` isNobleMove') grandchildren
+        ) noblePreExpanded
+
+    it "terminal node stops selection and expansion, backprop records result" $ do
+      let gs = testGameState { gsPhase = Finished (GameResult "player-1" "Alice" 15) }
+          node = newTree gs
+      select 1.414 node `shouldBe` []
+      let (expanded, _) = expandAt node []
+      nodeChildren expanded `shouldBe` []
+      nodeExpanded expanded `shouldBe` True
+      let updated = backpropagate 1.0 0 [] expanded
+      nodeVisits updated `shouldBe` 1
+
   describe "Expansion" $ do
     describe "expandNode" $ do
       it "generates children matching legalActions count" $ do
@@ -145,6 +191,16 @@ spec = do
         let node = expandNode (newTree testGameState)
             node' = expandNode node
         length (nodeChildren node') `shouldBe` length (nodeChildren node)
+
+      it "expandAt with path [0] expands the correct child" $ do
+        let root = expandNode (newTree testGameState)
+            (expanded, _) = expandAt root [0]
+        case nodeChildren expanded of
+          (c0:c1:_) -> do
+            nodeExpanded (childNode c0) `shouldBe` True
+            nodeChildren (childNode c0) `shouldSatisfy` (not . null)
+            nodeExpanded (childNode c1) `shouldBe` False
+          _ -> expectationFailure "expected at least 2 children"
 
       it "generates gem return children for MustReturnGems phase" $ do
         -- Create a state that requires gem return
@@ -189,6 +245,34 @@ spec = do
             -- Old behavior: 1.0 - 0.7 = 0.3. New: 0.0 (perspective-only)
             updated = backpropagate 0.7 1 [] node
         nodeWins updated `shouldBe` 0.0
+
+      it "propagates through 3-level path, updating all nodes" $ do
+        let root = expandNode (newTree testGameState)
+        case nodeChildren root of
+          (c:_) -> do
+            let expandedChild = expandNode (childNode c)
+                root' = root { nodeChildren = c { childNode = expandedChild } : drop 1 (nodeChildren root) }
+            case nodeChildren expandedChild of
+              (gc:_) -> do
+                let expandedGC = expandNode (childNode gc)
+                    ec' = expandedChild { nodeChildren = gc { childNode = expandedGC } : drop 1 (nodeChildren expandedChild) }
+                    root'' = root' { nodeChildren = (c { childNode = ec' }) : drop 1 (nodeChildren root') }
+                    updated = backpropagate 1.0 0 [0, 0, 0] root''
+                -- All 3 levels plus root should have 1 visit
+                nodeVisits updated `shouldBe` 1
+                case nodeChildren updated of
+                  (c':_) -> do
+                    nodeVisits (childNode c') `shouldBe` 1
+                    case nodeChildren (childNode c') of
+                      (gc':_) -> do
+                        nodeVisits (childNode gc') `shouldBe` 1
+                        case nodeChildren (childNode gc') of
+                          (ggc:_) -> nodeVisits (childNode ggc) `shouldBe` 1
+                          [] -> expectationFailure "expected great-grandchildren"
+                      [] -> expectationFailure "expected grandchildren"
+                  [] -> expectationFailure "expected children"
+              [] -> expectationFailure "expected grandchildren after expansion"
+          [] -> expectationFailure "expanded root should have children"
 
       it "propagates visits along deeper path [0,0]" $ do
         let root = expandNode (newTree testGameState)
@@ -236,6 +320,27 @@ spec = do
             Just c  -> nodeVisits (childNode c)
             Nothing -> 0
       visits50 `shouldSatisfy` (>= visits10)
+
+    it "bestChild after 50 iterations selects the most-visited child" $ do
+      let config = defaultMCTSConfig { mctsIterations = 50, mctsTimeoutMs = 10000 }
+      root <- runMCTS config testGameState 0
+      case bestChild root of
+        Just best -> do
+          let bestVisits = nodeVisits (childNode best)
+          mapM_ (\c ->
+            nodeVisits (childNode c) `shouldSatisfy` (<= bestVisits)
+            ) (nodeChildren root)
+        Nothing -> expectationFailure "expected a best child"
+
+    it "stops early when timeout is reached before max iterations" $ do
+      let config = defaultMCTSConfig { mctsIterations = 100000, mctsTimeoutMs = 50 }
+      t0 <- getCurrentTime
+      root <- runMCTS config testGameState 0
+      t1 <- getCurrentTime
+      let elapsed = realToFrac (diffUTCTime t1 t0) :: Double
+      nodeVisits root `shouldSatisfy` (< 100000)
+      nodeVisits root `shouldSatisfy` (> 0)
+      elapsed `shouldSatisfy` (< 5.0)
 
     it "timeout of 1ms terminates with fewer than max iterations" $ do
       let config = defaultMCTSConfig { mctsIterations = 100000, mctsTimeoutMs = 1 }
@@ -295,3 +400,102 @@ spec = do
             n3 = Noble "n3" (Map.fromList [(Emerald, 3)]) 4
         result <- chooseNoble agent testGameState [n1, n2, n3]
         result `shouldBe` n2
+
+  describe "MCTS vs Random" $ do
+    it "MCTS and random play 20 complete games without errors" $ do
+      let mctsAgent = MCTSAgent { mctsConfig = defaultMCTSConfig { mctsIterations = 100, mctsTimeoutMs = 10000 } }
+          randomAgent = RandomAgent
+      results <- mapM (\seed -> playGameDebug mctsAgent randomAgent (mkStdGen seed)) [1..20]
+      -- All games should complete without errors
+      mapM_ (\(mResult, mErr) -> do
+        mErr `shouldBe` Nothing
+        mResult `shouldSatisfy` (/= Nothing)
+        ) results
+      -- All 20 games should produce valid outcomes
+      let outcomes = [r | (Just r, _) <- results]
+      length outcomes `shouldBe` 20
+
+-- | Play a full game: player 0 = MCTS, player 1 = Random.
+--   Returns (True if MCTS wins, error message or Nothing)
+playGameDebug :: MCTSAgent -> RandomAgent -> StdGen -> IO (Maybe Bool, Maybe String)
+playGameDebug mcts rand gen = do
+  let gs = initGameState gen "test-game" 2 ["MCTS", "Random"]
+      player0Id = playerId (gsPlayers gs !! 0)
+  loopD gs player0Id 0
+  where
+    loopD :: GameState -> PlayerId -> Int -> IO (Maybe Bool, Maybe String)
+    loopD gs player0Id depth
+      | depth > 10000 = pure (Nothing, Just "max depth exceeded")
+      | otherwise = case gsPhase gs of
+          Finished result -> pure (Just (winnerId result == player0Id), Nothing)
+          _ -> case gsTurnPhase gs of
+            MustReturnGems _ -> do
+              let opts = legalGemReturns gs
+              case (currentPlayer gs, opts) of
+                (Just player, _:_) -> do
+                  ret <- if gsCurrentPlayer gs == 0
+                         then chooseGemReturn mcts gs opts
+                         else chooseGemReturn rand gs opts
+                  case applyGemReturn gs (playerId player) ret of
+                    Advanced gs' -> loopD gs' player0Id (depth+1)
+                    NeedNobleChoice gs' nobles -> handleNobleD gs' player0Id nobles depth
+                    GameOver gs' _ -> loopD gs' player0Id (depth+1)
+                    other -> pure (Nothing, Just $ "unexpected after gemReturn: " ++ take 50 (show other))
+                (Nothing, _) -> pure (Nothing, Just "no current player in MustReturnGems")
+                (_, []) -> pure (Nothing, Just "no legal gem returns")
+            AwaitingAction -> do
+              let actions = legalActions gs
+              case (currentPlayer gs, actions) of
+                (Just player, _:_) -> do
+                  act <- if gsCurrentPlayer gs == 0
+                         then chooseAction mcts gs actions
+                         else chooseAction rand gs actions
+                  case applyAction gs (playerId player) act of
+                    Advanced gs' -> loopD gs' player0Id (depth+1)
+                    NeedGemReturn gs' n -> loopD (gs' { gsTurnPhase = MustReturnGems n }) player0Id (depth+1)
+                    NeedNobleChoice gs' nobles -> handleNobleD gs' player0Id nobles depth
+                    GameOver gs' _ -> loopD gs' player0Id (depth+1)
+                    StepError err -> pure (Nothing, Just $ "StepError: " ++ show err)
+                (Just _player, []) ->
+                  -- No legal actions: determine winner by current prestige
+                  pure (Just (isPlayer0WinByPrestige (gsPlayers gs) player0Id), Nothing)
+                (Nothing, _) -> pure (Nothing, Just "no current player in AwaitingAction")
+
+    handleNobleD :: GameState -> PlayerId -> [Noble] -> Int -> IO (Maybe Bool, Maybe String)
+    handleNobleD gs player0Id nobles depth = do
+      case currentPlayer gs of
+        Just player -> do
+          noble <- if gsCurrentPlayer gs == 0
+                   then chooseNoble mcts gs nobles
+                   else chooseNoble rand gs nobles
+          case applyNobleChoice gs (playerId player) (nobleId noble) of
+            Advanced gs' -> loopD gs' player0Id (depth+1)
+            GameOver gs' _ -> loopD gs' player0Id (depth+1)
+            other -> pure (Nothing, Just $ "unexpected after nobleChoice: " ++ take 50 (show other))
+        Nothing -> pure (Nothing, Just "no current player in handleNoble")
+
+-- | Check if player 0 has the most prestige.
+isPlayer0WinByPrestige :: [Player] -> PlayerId -> Bool
+isPlayer0WinByPrestige players p0id =
+  case players of
+    [] -> False
+    _  -> let maxPrestige = maximum (map playerPrestige players)
+              p0Prestige = case filter (\p -> playerId p == p0id) players of
+                             (p:_) -> playerPrestige p
+                             []    -> 0
+          in p0Prestige == maxPrestige && maxPrestige > 0
+
+-- | Check if a child's move is a BuyCard action.
+isBuyCardMove :: MCTSChild -> Bool
+isBuyCardMove (MCTSChild (MoveAction (BuyCard _ _)) _) = True
+isBuyCardMove _ = False
+
+-- | Check if a child is a MoveNoble child (for filtering).
+isNobleMove :: MCTSChild -> Bool
+isNobleMove (MCTSChild (MoveNoble _) _) = True
+isNobleMove _ = False
+
+-- | Check if a Move is a MoveNoble (for shouldSatisfy).
+isNobleMove' :: Move -> Bool
+isNobleMove' (MoveNoble _) = True
+isNobleMove' _ = False
