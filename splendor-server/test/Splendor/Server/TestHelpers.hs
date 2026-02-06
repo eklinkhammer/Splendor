@@ -23,6 +23,7 @@ module Splendor.Server.TestHelpers
   , getH
   , joinH
   , startH
+  , addAIH
   , getGameH
     -- * WAI / HTTP helpers
   , testApp
@@ -185,7 +186,10 @@ joinH :: ServerState -> LobbyId -> JoinLobbyRequest -> Handler JoinLobbyResponse
 joinH ss = let (_ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
 
 startH :: ServerState -> LobbyId -> Handler StartGameResponse
-startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
+startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
+
+addAIH :: ServerState -> LobbyId -> Handler LobbySlot
+addAIH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
 
 getGameH :: ServerState -> GameId -> SessionId -> Handler PublicGameView
 getGameH ss = let (h :<|> _) = gameServer ss in h

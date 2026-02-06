@@ -35,6 +35,7 @@ library
     containers    >= 0.6,
     random        >= 1.2,
     text          >= 2.0,
+    time          >= 1.12,
 
 test-suite splendor-ai-test
   import:         shared
@@ -43,6 +44,7 @@ test-suite splendor-ai-test
   main-is:        Spec.hs
   other-modules:
     Splendor.AI.RandomSpec
+    Splendor.AI.MCTSSpec
   build-depends:
     base,
     splendor-ai,
@@ -50,3 +52,4 @@ test-suite splendor-ai-test
     hspec       >= 2.10,
     containers  >= 0.6,
     random,
+    time        >= 1.12,

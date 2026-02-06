@@ -1,5 +1,6 @@
 import type {
   Lobby,
+  LobbySlot,
   CreateLobbyResponse,
   JoinLobbyResponse,
   StartGameResponse,
@@ -40,6 +41,10 @@ export function joinLobby(id: string, playerName: string): Promise<JoinLobbyResp
     method: 'POST',
     body: JSON.stringify({ jlrPlayerName: playerName }),
   });
+}
+
+export function addAI(lobbyId: string): Promise<LobbySlot> {
+  return request(`${BASE}/lobbies/${lobbyId}/add-ai`, { method: 'POST' });
 }
 
 export function startGame(lobbyId: string): Promise<StartGameResponse> {

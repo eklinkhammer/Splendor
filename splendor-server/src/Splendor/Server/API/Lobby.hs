@@ -8,10 +8,12 @@ import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
 import Data.Time (getCurrentTime)
 import Servant
 
+import Splendor.Server.AIRunner (spawnAIPlayers)
 import Splendor.Server.GameManager (createGame)
 import Splendor.Server.Types
 
@@ -21,6 +23,7 @@ type LobbyAPI =
   :<|> "lobbies" :> Capture "id" LobbyId :> Get '[JSON] Lobby
   :<|> "lobbies" :> Capture "id" LobbyId :> "join" :> ReqBody '[JSON] JoinLobbyRequest :> Post '[JSON] JoinLobbyResponse
   :<|> "lobbies" :> Capture "id" LobbyId :> "start" :> Post '[JSON] StartGameResponse
+  :<|> "lobbies" :> Capture "id" LobbyId :> "add-ai" :> Post '[JSON] LobbySlot
 
 lobbyServer :: ServerState -> Server LobbyAPI
 lobbyServer ss =
@@ -29,6 +32,7 @@ lobbyServer ss =
   :<|> getLobbyHandler ss
   :<|> joinLobbyHandler ss
   :<|> startGameHandler ss
+  :<|> addAIHandler ss
 
 createLobbyHandler :: ServerState -> CreateLobbyRequest -> Handler CreateLobbyResponse
 createLobbyHandler ss req = do
@@ -114,9 +118,54 @@ startGameHandler ss lid = do
     Left err -> throwError err400 { errBody = encodeUtf8 err }
     Right lobby -> do
       gameId <- liftIO $ createGame ss (lobbySlots lobby)
+      -- Spawn AI player threads for any AI slots
+      let aiSlots = filter lsIsAI (lobbySlots lobby)
+      liftIO $ do
+        -- Look up the AI sessions from the managed game
+        mGameTVar <- atomically $ do
+          games <- readTVar (ssGames ss)
+          pure (Map.lookup gameId games)
+        case mGameTVar of
+          Just gameTVar -> do
+            mg <- readTVarIO gameTVar
+            let aiSessions = [ (lsSessionId slot, ps)
+                             | slot <- aiSlots
+                             , Just ps <- [Map.lookup (lsSessionId slot) (mgSessions mg)]
+                             ]
+            _ <- spawnAIPlayers ss gameId aiSessions
+            pure ()
+          Nothing -> pure ()  -- shouldn't happen
       liftIO $ atomically $ modifyTVar' (ssLobbies ss) $
         Map.adjust (\l -> l { lobbyStatus = Started gameId }) lid
       pure StartGameResponse { sgrGameId = gameId }
+
+addAIHandler :: ServerState -> LobbyId -> Handler LobbySlot
+addAIHandler ss lid = do
+  sid <- liftIO newUUID
+  result <- liftIO $ atomically $ do
+    lobbies <- readTVar (ssLobbies ss)
+    case Map.lookup lid lobbies of
+      Nothing -> pure (Left "Lobby not found")
+      Just lobby ->
+        case lobbyStatus lobby of
+          Waiting
+            | length (lobbySlots lobby) >= lobbyMaxPlayers lobby ->
+                pure (Left "Lobby is full")
+            | otherwise -> do
+                let aiCount = length (filter lsIsAI (lobbySlots lobby))
+                    aiName = "AI Player " <> T.pack (show (aiCount + 1))
+                    slot = LobbySlot
+                      { lsSessionId  = sid
+                      , lsPlayerName = aiName
+                      , lsIsAI       = True
+                      }
+                    lobby' = lobby { lobbySlots = lobbySlots lobby ++ [slot] }
+                modifyTVar' (ssLobbies ss) (Map.insert lid lobby')
+                pure (Right slot)
+          _ -> pure (Left "Lobby is not accepting players")
+  case result of
+    Left err -> throwError err400 { errBody = encodeUtf8 err }
+    Right slot -> pure slot
 
 encodeUtf8 :: Text -> LBS.ByteString
 encodeUtf8 = LBS.fromStrict . TE.encodeUtf8

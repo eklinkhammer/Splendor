@@ -28,6 +28,7 @@ library
     Splendor.Server.API
     Splendor.Server.API.Lobby
     Splendor.Server.API.Game
+    Splendor.Server.AIRunner
     Splendor.Server.WebSocket
     Splendor.Server.GameManager
     Splendor.Server.Persistence
@@ -78,11 +79,13 @@ test-suite splendor-server-test
     Splendor.Server.API.LobbyHTTPSpec
     Splendor.Server.API.GameHTTPSpec
     Splendor.Server.WebSocketSpec
+    Splendor.Server.AIRunnerSpec
     Splendor.Server.TestHelpers
   build-depends:
     base,
     splendor-server,
     splendor-core,
+    splendor-ai,
     hspec       >= 2.10,
     aeson       >= 2.1,
     containers  >= 0.6,

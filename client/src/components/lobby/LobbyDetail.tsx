@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLobby, startGame } from '../../services/api';
+import { getLobby, startGame, addAI } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import type { Lobby } from '../../types';
 
@@ -12,6 +12,7 @@ export function LobbyDetail({ lobbyId }: Props) {
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [addingAI, setAddingAI] = useState(false);
   const navigate = useNavigate();
   const sessionId = useSessionStore((s) => s.sessionId);
   const setGameId = useSessionStore((s) => s.setGameId);
@@ -56,12 +57,28 @@ export function LobbyDetail({ lobbyId }: Props) {
     }
   };
 
+  const handleAddAI = async () => {
+    setAddingAI(true);
+    setError(null);
+    try {
+      await addAI(lobbyId);
+      // Re-fetch lobby to show the new slot
+      const data = await getLobby(lobbyId);
+      setLobby(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add AI player');
+    } finally {
+      setAddingAI(false);
+    }
+  };
+
   if (!lobby) {
     return <p className="text-gray-500">Loading lobby...</p>;
   }
 
   const isCreator = lobby.lobbySlots[0]?.lsSessionId === sessionId;
   const canStart = isCreator && lobby.lobbySlots.length >= lobby.lobbyMinPlayers;
+  const canAddAI = isCreator && lobby.lobbySlots.length < lobby.lobbyMaxPlayers;
 
   return (
     <div className="space-y-4">
@@ -77,6 +94,9 @@ export function LobbyDetail({ lobbyId }: Props) {
                 {i + 1}
               </span>
               <span>{slot.lsPlayerName}</span>
+              {slot.lsIsAI && (
+                <span className="text-xs text-purple-600 font-medium">(AI)</span>
+              )}
               {slot.lsSessionId === sessionId && (
                 <span className="text-xs text-blue-500">(you)</span>
               )}
@@ -86,7 +106,16 @@ export function LobbyDetail({ lobbyId }: Props) {
       </div>
       {error && <p className="text-red-500 text-sm">{error}</p>}
       {lobby.lobbyStatus.tag === 'Waiting' && (
-        <div>
+        <div className="space-y-2">
+          {canAddAI && (
+            <button
+              onClick={handleAddAI}
+              disabled={addingAI}
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {addingAI ? 'Adding...' : 'Add AI Player'}
+            </button>
+          )}
           {canStart ? (
             <button
               onClick={handleStart}
