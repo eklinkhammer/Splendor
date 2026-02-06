@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { PublicGameView, ClientMessage, CardId, Tier } from '../../types';
 import { useGameStore } from '../../stores/gameStore';
 import { TakeGemsPanel } from './TakeGemsPanel';
@@ -90,9 +90,9 @@ export function useActionCallbacks(
   const legalActions = useGameStore((s) => s.legalActions);
   const [selectedCardId, setSelectedCardId] = useState<CardId | null>(null);
 
-  const buyableIds = getBuyableCardIds(legalActions);
-  const reservableIds = getReservableCardIds(legalActions);
-  const highlightCards = [...buyableIds, ...reservableIds];
+  const buyableIds = useMemo(() => getBuyableCardIds(legalActions), [legalActions]);
+  const reservableIds = useMemo(() => getReservableCardIds(legalActions), [legalActions]);
+  const highlightCards = useMemo(() => [...buyableIds, ...reservableIds], [buyableIds, reservableIds]);
 
   const onCardClick = useCallback(
     (cardId: CardId) => {

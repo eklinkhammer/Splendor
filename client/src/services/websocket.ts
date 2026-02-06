@@ -11,6 +11,7 @@ export function connectGame(
   onMessage: (msg: ServerMessage) => void,
   onClose: () => void,
   onError: (err: Event) => void,
+  onOpen?: () => void,
 ): GameSocket {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const url = `${protocol}//${location.host}/api/v1/games/${gameId}/ws?session=${encodeURIComponent(sessionId)}`;
@@ -24,6 +25,7 @@ export function connectGame(
         ws.send(JSON.stringify({ tag: 'Ping' }));
       }
     }, 25000);
+    onOpen?.();
   };
 
   ws.onmessage = (event) => {

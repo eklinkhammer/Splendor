@@ -35,8 +35,11 @@ export function useGameSocket(gameId: string | null, sessionId: string | null) {
       () => {
         setConnected(false);
       },
+      () => {
+        // onOpen — only mark connected after WebSocket handshake completes
+        if (mountedRef.current) setConnected(true);
+      },
     );
-    setConnected(true);
   }, [gameId, sessionId, handleMessage, setConnected]);
 
   useEffect(() => {

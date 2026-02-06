@@ -53,6 +53,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
           gameView: view,
           selfPlayerId: selfId,
           // Clear action-specific state on new game state
+          legalActions: [],
           gemReturnInfo: null,
           nobleChoices: null,
           error: null,
