@@ -62,6 +62,7 @@ test-suite splendor-core-test
     Splendor.Core.Rules.NobleLogicSpec
     Splendor.Core.Rules.WinConditionSpec
     Splendor.Core.Rules.ActionValidationSpec
+    Splendor.Core.Types.GameStateSpec
   build-depends:
     base,
     splendor-core,

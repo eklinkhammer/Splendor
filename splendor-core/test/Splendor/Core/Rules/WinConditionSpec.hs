@@ -66,6 +66,20 @@ spec = do
           Just result -> winnerId result `shouldBe` "p2"
           Nothing -> expectationFailure "Expected a winner"
 
+      it "true tie: same prestige, same card count, first in list wins" $ do
+        let p1 = playerWithPrestige "p1" 15 4  -- 15 prestige, 4 cards
+            p2 = playerWithPrestige "p2" 15 4  -- 15 prestige, 4 cards
+        case determineWinner [p1, p2] of
+          Just result -> winnerId result `shouldBe` "p1"
+          Nothing -> expectationFailure "Expected a winner"
+
+      it "true tie reversed order: first candidate in list wins" $ do
+        let p1 = playerWithPrestige "p1" 15 4
+            p2 = playerWithPrestige "p2" 15 4
+        case determineWinner [p2, p1] of
+          Just result -> winnerId result `shouldBe` "p2"
+          Nothing -> expectationFailure "Expected a winner"
+
       it "result has correct fields" $ do
         let p1 = playerWithPrestige "p1" 17 4
         case determineWinner [p1] of

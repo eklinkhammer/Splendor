@@ -566,6 +566,169 @@ spec = do
             length (boardNobles (gsBoard gs')) `shouldBe` 1
           other -> expectationFailure $ "Expected Advanced without noble, got: " ++ show other
 
+    -- ========== BuyCard with gold payment (full pipeline) ==========
+    describe "applyAction - BuyCard with gold payment" $ do
+      it "gold covers shortfall on one color" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 3), (Diamond, 1)] Emerald 1
+            -- Player has 1 Ruby + 2 Gold — gold covers 2 Ruby shortfall
+            tokens = mkGems [(GemToken Ruby, 1), (GemToken Diamond, 1), (GoldToken, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1), (GemToken Diamond, 1), (GoldToken, 2)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            -- Player should have 0 tokens left
+            totalGems (playerTokens p) `shouldBe` 0
+            -- Card should be purchased
+            length (playerPurchased p) `shouldBe` 1
+            cardId (head (playerPurchased p)) `shouldBe` "c1"
+            -- Bank gets payment back
+            gemCount (boardBank (gsBoard gs')) GoldToken `shouldBe` 7  -- 5 + 2
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "gold covers shortfalls across multiple colors" $ do
+        let card1 = mkCard "c1" Tier1 [(Ruby, 2), (Diamond, 2)] Emerald 0
+            -- Player has 1 Ruby + 1 Diamond + 2 Gold — gold covers 1 Ruby + 1 Diamond
+            tokens = mkGems [(GemToken Ruby, 1), (GemToken Diamond, 1), (GoldToken, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1), (GemToken Diamond, 1), (GoldToken, 2)]
+        case applyAction gs "p1" (BuyCard (FromDisplay "c1") payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            totalGems (playerTokens p) `shouldBe` 0
+            length (playerPurchased p) `shouldBe` 1
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+    -- ========== ReserveCard + gold → >10 tokens → NeedGemReturn ==========
+    describe "applyAction - ReserveCard triggering NeedGemReturn" $ do
+      it "reserve + gold pushes to >10 tokens → NeedGemReturn" $ do
+        let card1 = mkCard "c1" Tier1 [] Diamond 0
+            -- Player has exactly 10 tokens; reserving gives gold → 11 → must return 1
+            tokens = mkGems [(GemToken Ruby, 5), (GemToken Diamond, 5)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromDisplay "c1")) of
+          NeedGemReturn gs' excess -> do
+            excess `shouldBe` 1
+            -- Player should have card reserved
+            let p = gsPlayers gs' !! 0
+            length (playerReserved p) `shouldBe` 1
+            -- Player should have 11 tokens (including gold)
+            totalGems (playerTokens p) `shouldBe` 11
+          other -> expectationFailure $ "Expected NeedGemReturn, got: " ++ show other
+
+      it "reserve without gold at 10 tokens → Advanced (no excess)" $ do
+        let card1 = mkCard "c1" Tier1 [] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 5), (GemToken Diamond, 5)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            -- No gold in bank
+            bank = mkGems [(GemToken Ruby, 4), (GemToken Diamond, 4), (GemToken Emerald, 4),
+                           (GemToken Sapphire, 4), (GemToken Onyx, 4)]
+            board = Board
+              { boardTier1 = mkTierRow [] [card1]
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = bank
+              }
+            gs = mkGameState [p1, p2] board
+        case applyAction gs "p1" (ReserveCard (FromDisplay "c1")) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            -- No gold received, still at 10
+            totalGems (playerTokens p) `shouldBe` 10
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+    -- ========== BuyCard from FromTopOfDeck ==========
+    describe "applyAction - BuyCard from FromTopOfDeck" $ do
+      it "buys top card from tier 1 deck" $ do
+        let deckCard = mkCard "deck1" Tier1 [(Ruby, 1)] Diamond 0
+            tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [deckCard] []
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromTopOfDeck Tier1) payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerPurchased p) `shouldBe` 1
+            cardId (head (playerPurchased p)) `shouldBe` "deck1"
+            -- Deck should be empty now
+            length (tierDeck (boardTier1 (gsBoard gs'))) `shouldBe` 0
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
+      it "buying from empty deck returns StepError" $ do
+        let tokens = mkGems [(GemToken Ruby, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []  -- empty deck
+              , boardTier2 = mkTierRow [] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Ruby, 1)]
+        case applyAction gs "p1" (BuyCard (FromTopOfDeck Tier1) payment) of
+          StepError _ -> pure ()
+          other -> expectationFailure $ "Expected StepError, got: " ++ show other
+
+      it "buys from tier 2 deck" $ do
+        let deckCard = mkCard "t2deck" Tier2 [(Diamond, 1)] Ruby 2
+            tokens = mkGems [(GemToken Diamond, 2)]
+            p1 = playerWithTokens "p1" tokens
+            p2 = emptyPlayer "p2"
+            board = Board
+              { boardTier1 = mkTierRow [] []
+              , boardTier2 = mkTierRow [deckCard] []
+              , boardTier3 = mkTierRow [] []
+              , boardNobles = []
+              , boardBank = twoPlayerBank
+              }
+            gs = mkGameState [p1, p2] board
+            payment = mkGems [(GemToken Diamond, 1)]
+        case applyAction gs "p1" (BuyCard (FromTopOfDeck Tier2) payment) of
+          Advanced gs' -> do
+            let p = gsPlayers gs' !! 0
+            length (playerPurchased p) `shouldBe` 1
+            cardPrestige (head (playerPurchased p)) `shouldBe` 2
+          other -> expectationFailure $ "Expected Advanced, got: " ++ show other
+
     -- ========== Full game simulations ==========
     describe "full game simulation" $ do
       it "completes a 2-player random game within 500 turns" $ do
