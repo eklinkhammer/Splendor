@@ -203,7 +203,7 @@ data ServerMessage
   | GameOverMsg GameResult
   | ErrorMsg Text
   | Pong
-  deriving stock (Show, Generic)
+  deriving stock (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
 
 -- -----------------------------------------------------------------

@@ -65,6 +65,17 @@ spec = do
         Nothing -> expectationFailure "Lobby not found"
         Just lobby -> length (lobbySlots lobby) `shouldBe` 2
 
+    it "joining a started lobby throws 400" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "My Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ joinH ss lid (JoinLobbyRequest "Bob")
+      _ <- run $ startH ss lid
+      result <- Servant.runHandler $ joinH ss lid (JoinLobbyRequest "Charlie")
+      case result of
+        Left err -> errHTTPCode err `shouldBe` 400
+        Right _  -> expectationFailure "Expected 400 error for started lobby"
+
     it "full lobby throws 400" $ do
       ss <- newServerState
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "My Lobby")
@@ -110,6 +121,19 @@ spec = do
       case result of
         Left err -> errHTTPCode err `shouldBe` 400
         Right _  -> expectationFailure "Expected 400 on second start"
+
+    it "starting a started lobby throws 400" $ do
+      ss <- newServerState
+      resp <- run $ createH ss (CreateLobbyRequest "Alice" "My Lobby")
+      let lid = clrLobbyId resp
+      _ <- run $ joinH ss lid (JoinLobbyRequest "Bob")
+      _ <- run $ startH ss lid
+      -- Lobby is now in Started status; starting again should fail
+      result <- Servant.runHandler $ startH ss lid
+      case result of
+        Left err -> do
+          errHTTPCode err `shouldBe` 400
+        Right _  -> expectationFailure "Expected 400 on starting already-started lobby"
 
     it "lobby status transitions through Starting to Started" $ do
       ss <- newServerState

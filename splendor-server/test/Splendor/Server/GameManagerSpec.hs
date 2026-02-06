@@ -328,6 +328,69 @@ spec = do
       mg' <- readTVarIO gameTVar
       mgPendingNobles mg' `shouldBe` Nothing
 
+  describe "processGemReturn → GameOver" $ do
+    it "gem return on FinalRound last player triggers GameOver" $ do
+      (ss, gid, s1, s2) <- setupGame
+      gameTVar <- lookupGameTVarOrFail ss gid
+      -- Set up: player 0 has 15 prestige (triggers FinalRound),
+      -- player 1 is current with MustReturnGems, phase is FinalRound.
+      -- After gem return, advanceTurn wraps to player 0 → GameOver.
+      let prestigeCard = Card "pc1" Tier3 emptyGems Ruby 15
+      atomically $ modifyTVar' gameTVar $ \mg ->
+        let gs = mgGameState mg
+            ps = gsPlayers gs
+            p0 = (ps !! 0) { playerPurchased = [prestigeCard] }
+            p1 = (ps !! 1) { playerTokens = mkTokens [(GemToken Ruby, 6), (GemToken Diamond, 5)] }
+            ps' = replaceAt 0 p0 (replaceAt 1 p1 ps)
+        in mg { mgGameState = gs
+                  { gsPlayers = ps'
+                  , gsCurrentPlayer = 1
+                  , gsPhase = FinalRound
+                  , gsTurnPhase = MustReturnGems 1
+                  }
+              }
+      result <- processGemReturn ss gid s2 (singleGem (GemToken Ruby) 1)
+      result `shouldSatisfy` isRight
+      mg' <- readTVarIO gameTVar
+      mgStatus mg' `shouldBe` GameFinished
+      -- Sessions should be cleaned up
+      ms1 <- lookupSession ss s1
+      ms2 <- lookupSession ss s2
+      ms1 `shouldBe` Nothing
+      ms2 `shouldBe` Nothing
+
+  describe "processNobleChoice → GameOver" $ do
+    it "noble choice on FinalRound last player triggers GameOver" $ do
+      (ss, gid, s1, s2) <- setupGame
+      gameTVar <- lookupGameTVarOrFail ss gid
+      -- Set up: player 0 has 15 prestige (winner), player 1 is current.
+      -- Player 1 chooses a noble, advanceTurn wraps to player 0 → GameOver.
+      let prestigeCard = Card "pc1" Tier3 emptyGems Ruby 15
+          noble1 = Noble "test-n1" (Map.fromList [(Diamond, 1)]) 3
+          noble2 = Noble "test-n2" (Map.fromList [(Ruby, 1)]) 3
+      atomically $ modifyTVar' gameTVar $ \mg ->
+        let gs = mgGameState mg
+            ps = gsPlayers gs
+            p0 = (ps !! 0) { playerPurchased = [prestigeCard] }
+            ps' = replaceAt 0 p0 ps
+            board' = (gsBoard gs) { boardNobles = [noble1, noble2] }
+        in mg { mgGameState = gs
+                  { gsPlayers = ps'
+                  , gsCurrentPlayer = 1
+                  , gsPhase = FinalRound
+                  , gsBoard = board'
+                  }
+              }
+      result <- processNobleChoice ss gid s2 "test-n1"
+      result `shouldSatisfy` isRight
+      mg' <- readTVarIO gameTVar
+      mgStatus mg' `shouldBe` GameFinished
+      -- Sessions should be cleaned up
+      ms1 <- lookupSession ss s1
+      ms2 <- lookupSession ss s2
+      ms1 `shouldBe` Nothing
+      ms2 `shouldBe` Nothing
+
   describe "session cleanup" $ do
     it "sessions are removed from ssSessions after GameOver" $ do
       (ss, gid, s1, s2) <- setupGame
