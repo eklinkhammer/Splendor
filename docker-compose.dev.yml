@@ -1,11 +1,21 @@
 services:
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - client
+      - server
+
   server:
     build:
       context: .
       dockerfile: splendor-server/Dockerfile
       target: builder
-    ports:
-      - "8080:8080"
     volumes:
       - ./splendor-core/src:/build/splendor-core/src
       - ./splendor-ai/src:/build/splendor-ai/src
@@ -22,8 +32,6 @@ services:
   client:
     image: node:20-alpine
     working_dir: /app
-    ports:
-      - "5173:5173"
     volumes:
       - ./client:/app
       - client-modules:/app/node_modules
