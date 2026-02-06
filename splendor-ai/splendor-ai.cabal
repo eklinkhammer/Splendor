@@ -45,6 +45,8 @@ test-suite splendor-ai-test
   other-modules:
     Splendor.AI.RandomSpec
     Splendor.AI.MCTSSpec
+    Splendor.AI.MCTS.SimulationSpec
+    Splendor.AI.MCTS.ExpansionSpec
   build-depends:
     base,
     splendor-ai,

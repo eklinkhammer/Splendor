@@ -1,5 +1,7 @@
 module Splendor.Server.AIRunner
   ( spawnAIPlayers
+  , checkTurn
+  , AICheck(..)
   ) where
 
 import Control.Concurrent (ThreadId, forkIO, threadDelay)

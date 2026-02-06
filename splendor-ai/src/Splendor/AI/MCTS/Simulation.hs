@@ -1,6 +1,7 @@
 module Splendor.AI.MCTS.Simulation
   ( simulate
   , simulateFromState
+  , heuristicScore
   ) where
 
 import System.Random (randomRIO)
