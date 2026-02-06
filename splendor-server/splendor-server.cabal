@@ -69,8 +69,18 @@ test-suite splendor-server-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Spec.hs
+  other-modules:
+    Splendor.Server.TypesSpec
+    Splendor.Server.GameManagerSpec
+    Splendor.Server.API.LobbySpec
   build-depends:
     base,
     splendor-server,
     splendor-core,
-    hspec >= 2.10,
+    hspec       >= 2.10,
+    aeson       >= 2.1,
+    containers  >= 0.6,
+    stm         >= 2.5,
+    servant-server >= 0.20,
+    text        >= 2.0,
+    time        >= 1.12,

@@ -41,9 +41,12 @@ test-suite splendor-ai-test
   type:           exitcode-stdio-1.0
   hs-source-dirs: test
   main-is:        Spec.hs
+  other-modules:
+    Splendor.AI.RandomSpec
   build-depends:
     base,
     splendor-ai,
     splendor-core,
     hspec       >= 2.10,
+    containers  >= 0.6,
     random,
