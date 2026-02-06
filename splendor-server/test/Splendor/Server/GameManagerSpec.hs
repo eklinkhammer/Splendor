@@ -8,6 +8,7 @@ import Test.Hspec
 import Splendor.Core.Types
 import Splendor.Server.Types
 import Splendor.Server.GameManager
+import Splendor.Server.TestHelpers
 
 spec :: Spec
 spec = do
@@ -268,9 +269,6 @@ spec = do
       mg <- readTVarIO gameTVar
       let curIdx = gsCurrentPlayer (mgGameState mg)
           session = if curIdx == 0 then s1 else s2
-      -- Set up: player has 2 Diamond bonuses (purchased cards), board has 2 nobles
-      -- requiring 3 Diamond, and a cheap card giving +1 Diamond is in the display.
-      -- Buying that card → 3 Diamond bonuses → both nobles eligible → NeedNobleChoice
       let diamondCard1 = Card "dc1" Tier1 emptyGems Diamond 0
           diamondCard2 = Card "dc2" Tier1 emptyGems Diamond 0
           buyableCard  = Card "buyMe" Tier1 (singleGem (GemToken Ruby) 1) Diamond 0
@@ -305,7 +303,6 @@ spec = do
       mg <- readTVarIO gameTVar
       let curIdx = gsCurrentPlayer (mgGameState mg)
           session = if curIdx == 0 then s1 else s2
-      -- Trigger NeedNobleChoice same as above
       let diamondCard1 = Card "dc1" Tier1 emptyGems Diamond 0
           diamondCard2 = Card "dc2" Tier1 emptyGems Diamond 0
           buyableCard  = Card "buyMe" Tier1 (singleGem (GemToken Ruby) 1) Diamond 0
@@ -338,41 +335,23 @@ spec = do
       mg <- readTVarIO gameTVar
       let curIdx = gsCurrentPlayer (mgGameState mg)
           session = if curIdx == 0 then s1 else s2
-      -- Set up a game state where FinalRound + next player is 0 → GameOver
-      -- Player 0 has 15+ prestige, it's player 1's turn (so curIdx=1),
-      -- phase is FinalRound. When player 1's action advances turn back to 0,
-      -- the engine triggers GameOver.
-      -- Simpler: just set it to FinalRound with curPlayer = 1 (last player before wrap)
-      -- and give player 0 enough prestige.
       let prestigeCard = Card "pc1" Tier3 emptyGems Ruby 15
       atomically $ modifyTVar' gameTVar $ \mg' ->
         let gs = mgGameState mg'
             ps = gsPlayers gs
-            -- Give player 0 a card worth 15 prestige
             p0 = (ps !! 0) { playerPurchased = [prestigeCard] }
             ps' = replaceAt 0 p0 ps
-            -- Set current player to 1, FinalRound phase
             gs' = gs { gsPlayers = ps', gsCurrentPlayer = 1, gsPhase = FinalRound }
         in mg' { mgGameState = gs' }
-      -- Player 1 takes gems → turn advances → wraps to player 0 → GameOver
       _ <- processAction ss gid session (TakeGems (TakeDifferent [Ruby, Diamond, Emerald]))
-      -- Wait, need to make sure session is for player 1 (curIdx=1)
-      -- Actually we forced curIdx=1, so we need s2's session
-      -- Re-check: we set gsCurrentPlayer to 1, so we need player 1's session
-      -- But we don't know which session maps to which player index.
-      -- Let's look up the correct session.
       mg2 <- readTVarIO gameTVar
-      -- If it reached GameOver, sessions should be cleaned
       case mgStatus mg2 of
         GameFinished -> do
-          -- Verify sessions are removed from global map
           ms1 <- lookupSession ss s1
           ms2 <- lookupSession ss s2
           ms1 `shouldBe` Nothing
           ms2 `shouldBe` Nothing
         GameActive ->
-          -- The action might have failed because we picked the wrong session.
-          -- Try the other session.
           pendingAfterRetry ss gid s1 s2 gameTVar
 
   describe "registerConnection / unregisterConnection" $ do
@@ -436,59 +415,12 @@ spec = do
       resolveSession "unknown" mg `shouldBe` Nothing
 
 -- ============================================================
--- Setup helpers
+-- Local helpers (specific to this spec)
 -- ============================================================
-
--- | Create a ServerState with a 2-player game, returning identifiers
-setupGame :: IO (ServerState, GameId, SessionId, SessionId)
-setupGame = do
-  ss <- newServerState
-  let s1 = "session-1"
-      s2 = "session-2"
-      slots = [ LobbySlot s1 "Alice" False
-              , LobbySlot s2 "Bob" False
-              ]
-  gid <- createGame ss slots
-  pure (ss, gid, s1, s2)
-
--- | Look up a game TVar, failing the test if not found.
-lookupGameTVarOrFail :: ServerState -> GameId -> IO (TVar ManagedGame)
-lookupGameTVarOrFail ss gid = do
-  mGame <- lookupGame ss gid
-  case mGame of
-    Just tv -> pure tv
-    Nothing -> error "Game not found (test setup failure)"
-
--- | Read ManagedGame, failing the test if game not found.
-lookupGameOrFail :: ServerState -> GameId -> IO ManagedGame
-lookupGameOrFail ss gid = lookupGameTVarOrFail ss gid >>= readTVarIO
-
--- | Get the session ID of the current player.
-currentSession :: ServerState -> GameId -> SessionId -> SessionId -> IO SessionId
-currentSession ss gid s1 s2 = do
-  mg <- lookupGameOrFail ss gid
-  let curIdx = gsCurrentPlayer (mgGameState mg)
-  pure $ if curIdx == 0 then s1 else s2
-
--- | Get the session ID of the non-current player.
-wrongSession :: ServerState -> GameId -> SessionId -> SessionId -> IO SessionId
-wrongSession ss gid s1 s2 = do
-  mg <- lookupGameOrFail ss gid
-  let curIdx = gsCurrentPlayer (mgGameState mg)
-  pure $ if curIdx == 0 then s2 else s1
-
--- | Replace the element at a given index in a list.
-replaceAt :: Int -> a -> [a] -> [a]
-replaceAt idx x xs = take idx xs ++ [x] ++ drop (idx + 1) xs
-
--- | Build a GemCollection from a list of (TokenType, Int) pairs.
-mkTokens :: [(TokenType, Int)] -> GemCollection
-mkTokens = GemCollection . Map.fromList
 
 -- | Helper for session cleanup test retry with the other session.
 pendingAfterRetry :: ServerState -> GameId -> SessionId -> SessionId -> TVar ManagedGame -> IO ()
 pendingAfterRetry ss gid s1 s2 gameTVar = do
-  -- Reset game state for retry with the other player
   mg <- readTVarIO gameTVar
   let curIdx = gsCurrentPlayer (mgGameState mg)
       otherSession = if curIdx == 0 then s1 else s2
@@ -500,33 +432,3 @@ pendingAfterRetry ss gid s1 s2 gameTVar = do
   ms2 <- lookupSession ss s2
   ms1 `shouldBe` Nothing
   ms2 `shouldBe` Nothing
-
--- ============================================================
--- Message matchers
--- ============================================================
-
-isJustGameStateUpdate :: Maybe ServerMessage -> Bool
-isJustGameStateUpdate (Just (GameStateUpdate _)) = True
-isJustGameStateUpdate _                          = False
-
-isJustActionRequired :: Maybe ServerMessage -> Bool
-isJustActionRequired (Just (ActionRequired _)) = True
-isJustActionRequired _                         = False
-
--- | Drain all available messages from a TChan.
-drainChan :: TChan ServerMessage -> IO [ServerMessage]
-drainChan chan = do
-  mMsg <- atomically $ tryReadTChan chan
-  case mMsg of
-    Nothing  -> pure []
-    Just msg -> (msg :) <$> drainChan chan
-
--- | Short tag for a ServerMessage (for error reporting).
-msgTag :: ServerMessage -> String
-msgTag (GameStateUpdate _)    = "GameStateUpdate"
-msgTag (ActionRequired _)     = "ActionRequired"
-msgTag (GemReturnNeeded n _)  = "GemReturnNeeded(" ++ show n ++ ")"
-msgTag (NobleChoiceRequired _)= "NobleChoiceRequired"
-msgTag (GameOverMsg _)        = "GameOverMsg"
-msgTag (ErrorMsg t)           = "ErrorMsg(" ++ show t ++ ")"
-msgTag Pong                   = "Pong"

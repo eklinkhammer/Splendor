@@ -72,7 +72,10 @@ test-suite splendor-server-test
   other-modules:
     Splendor.Server.TypesSpec
     Splendor.Server.GameManagerSpec
+    Splendor.Server.GameplayIntegrationSpec
     Splendor.Server.API.LobbySpec
+    Splendor.Server.API.GameSpec
+    Splendor.Server.TestHelpers
   build-depends:
     base,
     splendor-server,
@@ -84,3 +87,4 @@ test-suite splendor-server-test
     servant-server >= 0.20,
     text        >= 2.0,
     time        >= 1.12,
+    random      >= 1.2,

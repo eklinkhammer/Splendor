@@ -87,7 +87,8 @@ processAction ss gid sid action = do
                 broadcastGameState mg'
                 pure (Right ())
               NeedGemReturn gs' n -> do
-                let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
+                let gs'' = gs' { gsTurnPhase = MustReturnGems n }
+                    mg' = mg { mgGameState = gs'', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 sendGemReturnPrompt mg' n
