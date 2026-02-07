@@ -8,6 +8,7 @@ interface Props {
   onCardClick?: (cardId: CardId) => void;
   onDeckClick?: (tier: Tier) => void;
   highlightCards?: CardId[];
+  selectedCardId?: CardId | null;
 }
 
 export function GameBoard({
@@ -15,6 +16,7 @@ export function GameBoard({
   onCardClick,
   onDeckClick,
   highlightCards,
+  selectedCardId,
 }: Props) {
   return (
     <div className="bg-[var(--board-felt)] rounded-xl p-6 shadow-inner space-y-4">
@@ -32,6 +34,7 @@ export function GameBoard({
           onCardClick={onCardClick}
           onDeckClick={onDeckClick ? () => onDeckClick('Tier3') : undefined}
           highlightCards={highlightCards}
+          selectedCardId={selectedCardId}
         />
         <TierRow
           tier="Tier2"
@@ -39,6 +42,7 @@ export function GameBoard({
           onCardClick={onCardClick}
           onDeckClick={onDeckClick ? () => onDeckClick('Tier2') : undefined}
           highlightCards={highlightCards}
+          selectedCardId={selectedCardId}
         />
         <TierRow
           tier="Tier1"
@@ -46,6 +50,7 @@ export function GameBoard({
           onCardClick={onCardClick}
           onDeckClick={onDeckClick ? () => onDeckClick('Tier1') : undefined}
           highlightCards={highlightCards}
+          selectedCardId={selectedCardId}
         />
       </div>
 

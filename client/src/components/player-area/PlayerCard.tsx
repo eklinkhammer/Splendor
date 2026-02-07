@@ -1,4 +1,4 @@
-import type { PublicPlayer, GemColor } from '../../types';
+import type { PublicPlayer, GemColor, CardId } from '../../types';
 import { ALL_GEM_COLORS, ALL_TOKEN_TYPES, countBonuses } from '../../types';
 import { GemToken } from '../game-board/GemToken';
 import { CardDisplay } from '../game-board/CardDisplay';
@@ -24,9 +24,10 @@ interface Props {
   isSelf: boolean;
   isActive: boolean;
   onReservedCardClick?: (cardId: string) => void;
+  selectedCardId?: CardId | null;
 }
 
-export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Props) {
+export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, selectedCardId }: Props) {
   const bonuses = countBonuses(player.ppPurchased);
   const hasTokens = ALL_TOKEN_TYPES.some((t) => (player.ppTokens[t] ?? 0) > 0);
   const hasBonuses = ALL_GEM_COLORS.some((c) => (bonuses[c] ?? 0) > 0);
@@ -120,6 +121,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
                   key={card.cardId}
                   card={card}
                   onClick={onReservedCardClick ? () => onReservedCardClick(card.cardId) : undefined}
+                  selected={card.cardId === selectedCardId}
                 />
               ))}
             </div>

@@ -101,6 +101,7 @@ export function GamePage() {
               onCardClick={onCardClick}
               onDeckClick={onDeckClick}
               highlightCards={highlightCards}
+              selectedCardId={selectedCardId}
             />
             <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
               <ActionPanel
@@ -119,6 +120,7 @@ export function GamePage() {
               selfPlayerId={selfPlayerId}
               currentPlayerIndex={gameView.pgvCurrentPlayer}
               onReservedCardClick={onCardClick}
+              selectedCardId={selectedCardId}
             />
           </div>
         </div>

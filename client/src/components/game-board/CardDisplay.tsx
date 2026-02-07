@@ -37,9 +37,10 @@ interface Props {
   card: Card;
   onClick?: () => void;
   highlight?: boolean;
+  selected?: boolean;
 }
 
-export function CardDisplay({ card, onClick, highlight }: Props) {
+export function CardDisplay({ card, onClick, highlight, selected }: Props) {
   const costEntries = ALL_GEM_COLORS.filter((c) => (card.cardCost[c] ?? 0) > 0);
 
   return (
@@ -49,7 +50,7 @@ export function CardDisplay({ card, onClick, highlight }: Props) {
       disabled={!onClick}
       className={`w-28 h-[var(--card-height)] rounded-lg overflow-hidden flex flex-col
         border-2 transition-all duration-200
-        ${highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-600/80'}
+        ${selected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 scale-105 border-amber-400 shadow-lg shadow-amber-300/50' : highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-600/80'}
         ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:border-amber-300' : 'cursor-default'}
         bg-[var(--card-bg)] shadow-md`}
     >

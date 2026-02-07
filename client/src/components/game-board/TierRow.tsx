@@ -25,9 +25,10 @@ interface Props {
   onCardClick?: (cardId: CardId) => void;
   onDeckClick?: () => void;
   highlightCards?: CardId[];
+  selectedCardId?: CardId | null;
 }
 
-export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [] }: Props) {
+export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [], selectedCardId }: Props) {
   return (
     <div className="flex items-center gap-2">
       {/* Tier label */}
@@ -57,6 +58,7 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
           card={card}
           onClick={onCardClick ? () => onCardClick(card.cardId) : undefined}
           highlight={highlightCards.includes(card.cardId)}
+          selected={card.cardId === selectedCardId}
         />
       ))}
 
