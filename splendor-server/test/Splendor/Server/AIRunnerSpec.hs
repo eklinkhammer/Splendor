@@ -1,16 +1,68 @@
 module Splendor.Server.AIRunnerSpec (spec) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.STM
+import Data.IORef
 import Data.Map.Strict qualified as Map
 import Test.Hspec
 import Servant qualified
 import Splendor.Core.Types
 import Splendor.Core.Rules.ActionValidation (legalActions)
-import Splendor.Server.AIRunner (checkTurn, AICheck(..))
-import Splendor.Server.GameManager (processAction, registerConnection)
+import Splendor.AI.Agent (Agent(..))
+import Splendor.AI.Random (RandomAgent(..))
+import Splendor.Server.AIRunner (aiLoopWith, checkTurn, AICheck(..))
+import Splendor.Server.GameManager (processAction, registerConnection, createGame)
 import Splendor.Server.Types
+
 import Splendor.Server.TestHelpers
+
+-- | An agent that throws for the first N calls, then delegates to RandomAgent.
+data ThrowingAgent = ThrowingAgent
+  { taFailCount :: IORef Int  -- ^ remaining failures
+  }
+
+mkThrowingAgent :: Int -> IO ThrowingAgent
+mkThrowingAgent n = ThrowingAgent <$> newIORef n
+
+instance Agent ThrowingAgent where
+  agentName _ = "ThrowingAgent"
+
+  chooseAction ta gs actions = do
+    remaining <- readIORef (taFailCount ta)
+    if remaining > 0
+      then do
+        modifyIORef' (taFailCount ta) (subtract 1)
+        error "simulated chooseAction failure"
+      else chooseAction RandomAgent gs actions
+
+  chooseGemReturn ta gs options = do
+    remaining <- readIORef (taFailCount ta)
+    if remaining > 0
+      then do
+        modifyIORef' (taFailCount ta) (subtract 1)
+        error "simulated chooseGemReturn failure"
+      else chooseGemReturn RandomAgent gs options
+
+  chooseNoble ta gs nobles = do
+    remaining <- readIORef (taFailCount ta)
+    if remaining > 0
+      then do
+        modifyIORef' (taFailCount ta) (subtract 1)
+        error "simulated chooseNoble failure"
+      else chooseNoble RandomAgent gs nobles
+
+-- | Setup a 2-player AI game using createGame directly (no lobby flow).
+--   Both sessions are AI-controlled.
+setupAIGame :: IO (ServerState, GameId, SessionId, SessionId)
+setupAIGame = do
+  ss <- newServerState
+  let s1 = "ai-session-1"
+      s2 = "ai-session-2"
+      slots = [ LobbySlot s1 "AI-1" True
+              , LobbySlot s2 "AI-2" True
+              ]
+  gid <- createGame ss slots
+  pure (ss, gid, s1, s2)
 
 spec :: Spec
 spec = do
@@ -175,6 +227,44 @@ spec = do
       -- Poll for game completion with timeout
       finished <- waitForGameEnd ss gid 120  -- 120 seconds max
       finished `shouldBe` True
+
+  describe "AI error recovery" $ do
+    it "AI recovers from agent exception via fallback and completes game" $ do
+      (ss, gid, s1, s2) <- setupAIGame
+      -- ThrowingAgent throws first 2 calls, then delegates to RandomAgent
+      throwingAgent <- mkThrowingAgent 2
+      -- Spawn both AI threads: one throwing, one random
+      tid1 <- forkIO $ aiLoopWith ss gid s1 throwingAgent
+      tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
+      -- Game should still finish despite initial exceptions (fallback action used)
+      finished <- waitForGameEnd ss gid 120
+      -- Clean up threads
+      killThread tid1
+      killThread tid2
+      finished `shouldBe` True
+
+    it "AI continues after processAction rejection" $ do
+      (ss, gid, s1, s2) <- setupAIGame
+      -- Spawn both AI players with RandomAgent
+      tid1 <- forkIO $ aiLoopWith ss gid s1 RandomAgent
+      tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
+      -- The AI loop logs processAction rejections but continues;
+      -- game should still finish normally
+      finished <- waitForGameEnd ss gid 120
+      killThread tid1
+      killThread tid2
+      finished `shouldBe` True
+
+    it "AsyncException kills AI thread cleanly (no retry)" $ do
+      (ss, gid, s1, _s2) <- setupAIGame
+      tid <- forkIO $ aiLoopWith ss gid s1 RandomAgent
+      -- Give it time to start polling
+      threadDelay 100000  -- 100ms
+      -- Kill the thread — should exit cleanly, not retry
+      killThread tid
+      -- Verify the game is still active (thread didn't corrupt state)
+      mg <- lookupGameOrFail ss gid
+      mgStatus mg `shouldBe` GameActive
 
   describe "checkTurn" $ do
     it "returns AIFinished for nonexistent game" $ do

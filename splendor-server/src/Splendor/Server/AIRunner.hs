@@ -1,13 +1,15 @@
 module Splendor.Server.AIRunner
   ( spawnAIPlayers
+  , aiLoopWith
   , checkTurn
   , AICheck(..)
   ) where
 
 import Control.Concurrent (ThreadId, forkIO, threadDelay)
 import Control.Concurrent.STM
-import Control.Exception (SomeException, try)
+import Control.Exception (AsyncException, SomeException, fromException, try)
 import Data.Map.Strict qualified as Map
+import System.IO (hPutStrLn, stderr)
 
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
 import Splendor.Core.Types
@@ -24,11 +26,41 @@ spawnAIPlayers ss gid aiSessions =
   mapM (\(sid, _ps) -> forkIO (aiLoop ss gid sid)) aiSessions
 
 -- | Main AI loop: polls the game state and makes moves when it's the AI's turn.
+--   Wraps the inner loop in a retry mechanism so transient exceptions don't kill the thread.
 aiLoop :: ServerState -> GameId -> SessionId -> IO ()
-aiLoop ss gid sid = do
-  threadDelay aiMoveDelayUs
-  go
+aiLoop ss gid sid =
+  aiLoopWith ss gid sid agent
   where
+    agent :: MCTSAgent
+    agent = MCTSAgent { mctsConfig = defaultMCTSConfig { mctsIterations = 200, mctsTimeoutMs = 2000 } }
+
+-- | Parameterized AI loop for testing: accepts any 'Agent' instance.
+aiLoopWith :: forall a. Agent a => ServerState -> GameId -> SessionId -> a -> IO ()
+aiLoopWith ss gid sid agent = do
+  threadDelay aiMoveDelayUs
+  retryLoop (0 :: Int)
+  where
+    maxRetries :: Int
+    maxRetries = 5
+
+    retryLoop :: Int -> IO ()
+    retryLoop retries = do
+      result <- try @SomeException go
+      case result of
+        Right () -> pure ()  -- normal exit (game finished)
+        Left ex
+          | Just (_ :: AsyncException) <- fromException ex ->
+              -- Thread killed (e.g. game cleanup) — let it die
+              pure ()
+          | retries >= maxRetries -> do
+              logAI $ "AI thread dying after " ++ show maxRetries
+                ++ " retries. Last error: " ++ show ex
+          | otherwise -> do
+              logAI $ "AI loop exception (retry " ++ show (retries + 1)
+                ++ "/" ++ show maxRetries ++ "): " ++ show ex
+              threadDelay 1000000  -- 1s backoff
+              retryLoop (retries + 1)
+
     go :: IO ()
     go = do
       mAction <- atomically $ checkTurn ss gid sid
@@ -45,8 +77,13 @@ aiLoop ss gid sid = do
               result <- try @SomeException (chooseAction agent gs actions)
               action <- case result of
                 Right a -> pure a
-                Left _  -> pure fallback
-              _ <- processAction ss gid sid action
+                Left ex -> do
+                  logAI $ "chooseAction exception, using fallback: " ++ show ex
+                  pure fallback
+              processResult <- processAction ss gid sid action
+              case processResult of
+                Left err -> logAI $ "processAction rejected: " ++ show err
+                Right () -> pure ()
               threadDelay aiMoveDelayUs
               go
         AINeedGemReturn gs _pid -> do
@@ -57,23 +94,33 @@ aiLoop ss gid sid = do
               result <- try @SomeException (chooseGemReturn agent gs options)
               ret <- case result of
                 Right r -> pure r
-                Left _  -> pure fallback
-              _ <- processGemReturn ss gid sid ret
+                Left ex -> do
+                  logAI $ "chooseGemReturn exception, using fallback: " ++ show ex
+                  pure fallback
+              processResult <- processGemReturn ss gid sid ret
+              case processResult of
+                Left err -> logAI $ "processGemReturn rejected: " ++ show err
+                Right () -> pure ()
               threadDelay aiMoveDelayUs
               go
         AINeedNoble gs _pid nobles -> do
           result <- try @SomeException (chooseNoble agent gs nobles)
           noble <- case result of
             Right n -> pure n
-            Left _  -> case nobles of
-              (n:_) -> pure n
-              []    -> pure (Noble "" mempty 0)  -- shouldn't happen
-          _ <- processNobleChoice ss gid sid (nobleId noble)
+            Left ex -> do
+              logAI $ "chooseNoble exception, using fallback: " ++ show ex
+              case nobles of
+                (n:_) -> pure n
+                []    -> pure (Noble "" mempty 0)  -- shouldn't happen
+          processResult <- processNobleChoice ss gid sid (nobleId noble)
+          case processResult of
+            Left err -> logAI $ "processNobleChoice rejected: " ++ show err
+            Right () -> pure ()
           threadDelay aiMoveDelayUs
           go
 
-    agent :: MCTSAgent
-    agent = MCTSAgent { mctsConfig = defaultMCTSConfig { mctsIterations = 200, mctsTimeoutMs = 2000 } }
+    logAI :: String -> IO ()
+    logAI msg = hPutStrLn stderr $ "[AI:" ++ show gid ++ ":" ++ show sid ++ "] " ++ msg
 
 -- | Result of checking whether the AI needs to act.
 data AICheck
