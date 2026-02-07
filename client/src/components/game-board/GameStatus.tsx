@@ -25,7 +25,7 @@ export function GameStatus({ gameView, selfPlayerId }: Props) {
 
   return (
     <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-xl shadow-lg">
-      <span className="text-sm bg-gray-700 px-3 py-1 rounded-full font-medium">
+      <span className="text-sm bg-gray-700 px-3 py-1 rounded-full font-medium min-w-[5rem] text-center">
         Turn {gameView.pgvTurnNumber}
       </span>
       <div className="flex items-center gap-2">
@@ -39,12 +39,10 @@ export function GameStatus({ gameView, selfPlayerId }: Props) {
           {isMyTurn ? 'Your Turn' : `${currentPlayer?.ppPlayerName ?? '?'}'s Turn`}
         </span>
       </div>
-      {phaseLabel ? (
-        <span className={`text-sm font-bold px-3 py-1 rounded-full ${phaseBadge}`}>
+      {phaseLabel && (
+        <span className={`text-sm font-bold px-3 py-1 rounded-full min-w-[5rem] text-center ${phaseBadge}`}>
           {phaseLabel}
         </span>
-      ) : (
-        <span className="w-24" />
       )}
     </div>
   );

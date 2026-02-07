@@ -19,7 +19,7 @@ interface Props {
 
 export function GemBank({ bank, onGemClick, selectedGems = [] }: Props) {
   return (
-    <div className="bg-gray-800/80 rounded-xl px-4 py-3">
+    <div className="bg-[var(--board-felt-light)] rounded-xl px-4 py-3">
       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 text-center">
         Gem Bank
       </div>

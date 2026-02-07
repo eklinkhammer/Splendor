@@ -40,7 +40,7 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
         type="button"
         onClick={onDeckClick}
         disabled={!onDeckClick || row.publicDeckCount === 0}
-        className={`w-28 h-[156px] rounded-lg border-2 flex flex-col items-center justify-center
+        className={`w-28 h-[var(--card-height)] rounded-lg border-2 flex flex-col items-center justify-center
           bg-gradient-to-br ${TIER_DECK_STYLES[tier]} shadow-md
           ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:shadow-lg hover:brightness-110 transition-all' : 'cursor-default opacity-60'}`}
       >
@@ -62,7 +62,7 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
 
       {/* Empty slots */}
       {Array.from({ length: Math.max(0, 4 - row.publicDisplay.length) }).map((_, i) => (
-        <div key={`empty-${i}`} className="w-28 h-[156px] rounded-lg border-2 border-dashed border-white/20 bg-white/5" />
+        <div key={`empty-${i}`} className="w-28 h-[var(--card-height)] rounded-lg border-2 border-dashed border-white/20 bg-white/5" />
       ))}
     </div>
   );

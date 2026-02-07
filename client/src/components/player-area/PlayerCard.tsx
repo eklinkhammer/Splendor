@@ -4,11 +4,11 @@ import { GemToken } from '../game-board/GemToken';
 import { CardDisplay } from '../game-board/CardDisplay';
 
 const BONUS_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-white border border-gray-300 text-gray-800',
-  Sapphire: 'bg-blue-600 text-white',
-  Emerald: 'bg-green-600 text-white',
-  Ruby: 'bg-red-600 text-white',
-  Onyx: 'bg-gray-800 text-white',
+  Diamond: 'bg-[var(--gem-diamond)] border border-gray-300 text-gray-800',
+  Sapphire: 'bg-[var(--gem-sapphire)] text-white',
+  Emerald: 'bg-[var(--gem-emerald)] text-white',
+  Ruby: 'bg-[var(--gem-ruby)] text-white',
+  Onyx: 'bg-[var(--gem-onyx)] text-white',
 };
 
 const BONUS_LABELS: Record<GemColor, string> = {

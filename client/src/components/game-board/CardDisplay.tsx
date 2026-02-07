@@ -18,11 +18,11 @@ const BONUS_COLORS: Record<GemColor, string> = {
 };
 
 const COST_PILL_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-white border border-gray-300 text-gray-800',
-  Sapphire: 'bg-blue-600 text-white',
-  Emerald: 'bg-green-600 text-white',
-  Ruby: 'bg-red-600 text-white',
-  Onyx: 'bg-gray-800 text-white',
+  Diamond: 'bg-[var(--gem-diamond)] border border-gray-300 text-gray-800',
+  Sapphire: 'bg-[var(--gem-sapphire)] text-white',
+  Emerald: 'bg-[var(--gem-emerald)] text-white',
+  Ruby: 'bg-[var(--gem-ruby)] text-white',
+  Onyx: 'bg-[var(--gem-onyx)] text-white',
 };
 
 const PRESTIGE_TEXT: Record<GemColor, string> = {
@@ -47,11 +47,11 @@ export function CardDisplay({ card, onClick, highlight }: Props) {
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`w-28 h-[156px] rounded-lg overflow-hidden flex flex-col
+      className={`w-28 h-[var(--card-height)] rounded-lg overflow-hidden flex flex-col
         border-2 transition-all duration-200
         ${highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-300/80'}
         ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:border-amber-300' : 'cursor-default'}
-        bg-amber-50 shadow-md`}
+        bg-[var(--card-bg)] shadow-md`}
     >
       {/* Header band with gradient */}
       <div className={`relative h-[46px] w-full bg-gradient-to-br ${HEADER_GRADIENTS[card.cardBonus]} flex items-start justify-between px-2 pt-1.5`}>
