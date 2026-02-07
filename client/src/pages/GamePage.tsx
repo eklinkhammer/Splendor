@@ -20,6 +20,8 @@ export function GamePage() {
   const selfPlayerId = useGameStore((s) => s.selfPlayerId);
   const connected = useGameStore((s) => s.connected);
   const reset = useGameStore((s) => s.reset);
+  const setGameId = useSessionStore((s) => s.setGameId);
+  const setLobbyId = useSessionStore((s) => s.setLobbyId);
 
   // Redirect if no session
   useEffect(() => {
@@ -56,8 +58,12 @@ export function GamePage() {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => reset();
-  }, [reset]);
+    return () => {
+      reset();
+      setGameId(null);
+      setLobbyId(null);
+    };
+  }, [reset, setGameId, setLobbyId]);
 
   if (!id || !sessionId) return null;
 
