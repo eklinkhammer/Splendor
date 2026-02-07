@@ -39,11 +39,9 @@ export function GameStatus({ gameView, selfPlayerId }: Props) {
           {isMyTurn ? 'Your Turn' : `${currentPlayer?.ppPlayerName ?? '?'}'s Turn`}
         </span>
       </div>
-      {phaseLabel && (
-        <span className={`text-sm font-bold px-3 py-1 rounded-full min-w-[5rem] text-center ${phaseBadge}`}>
-          {phaseLabel}
-        </span>
-      )}
+      <span className={`text-sm font-bold px-3 py-1 rounded-full min-w-[5rem] text-center ${phaseBadge}`}>
+        {phaseLabel}
+      </span>
     </div>
   );
 }
