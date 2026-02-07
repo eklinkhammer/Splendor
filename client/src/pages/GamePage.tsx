@@ -10,6 +10,7 @@ import { PlayerArea } from '../components/player-area/PlayerArea';
 import { ActionPanel, useActionCallbacks } from '../components/action-panel/ActionPanel';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { GameOverOverlay } from '../components/game-board/GameOverOverlay';
+import { MoveLog } from '../components/game-board/MoveLog';
 
 export function GamePage() {
   const { id } = useParams<{ id: string }>();
@@ -122,6 +123,9 @@ export function GamePage() {
               onReservedCardClick={onCardClick}
               selectedCardId={selectedCardId}
             />
+            <div className="mt-3">
+              <MoveLog />
+            </div>
           </div>
         </div>
       </div>

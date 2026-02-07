@@ -25,9 +25,10 @@ interface Props {
   isActive: boolean;
   onReservedCardClick?: (cardId: string) => void;
   selectedCardId?: CardId | null;
+  lastMoveText?: string;
 }
 
-export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, selectedCardId }: Props) {
+export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, selectedCardId, lastMoveText }: Props) {
   const bonuses = countBonuses(player.ppPurchased);
   const hasTokens = ALL_TOKEN_TYPES.some((t) => (player.ppTokens[t] ?? 0) > 0);
   const hasBonuses = ALL_GEM_COLORS.some((c) => (bonuses[c] ?? 0) > 0);
@@ -41,8 +42,17 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, sele
         ${isActive ? 'bg-gradient-to-r from-green-600 to-green-700 text-white' : 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100'}`}
       >
         <div className="flex items-center gap-2">
-          <span className="font-bold">{player.ppPlayerName}</span>
-          {isSelf && <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded text-white/90">you</span>}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="font-bold">{player.ppPlayerName}</span>
+              {isSelf && <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded text-white/90">you</span>}
+            </div>
+            {lastMoveText && (
+              <div className="text-[10px] text-gray-400 truncate max-w-[160px]">
+                {lastMoveText}
+              </div>
+            )}
+          </div>
         </div>
         <span className="bg-purple-500 text-white text-sm font-bold px-2.5 py-0.5 rounded-full shadow-sm">
           {player.ppPrestige} VP

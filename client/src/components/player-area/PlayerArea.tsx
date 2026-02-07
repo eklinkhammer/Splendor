@@ -1,4 +1,5 @@
 import type { PublicPlayer, PlayerId, CardId } from '../../types';
+import { useGameStore } from '../../stores/gameStore';
 import { PlayerCard } from './PlayerCard';
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function PlayerArea({ players, selfPlayerId, currentPlayerIndex, onReservedCardClick, selectedCardId }: Props) {
+  const lastMove = useGameStore((s) => s.lastMove);
+
   return (
     <div className="space-y-2">
       {players.map((player, idx) => (
@@ -22,6 +25,11 @@ export function PlayerArea({ players, selfPlayerId, currentPlayerIndex, onReserv
             player.ppPlayerId === selfPlayerId ? onReservedCardClick : undefined
           }
           selectedCardId={selectedCardId}
+          lastMoveText={
+            player.ppPlayerId === lastMove?.playerId && idx !== currentPlayerIndex
+              ? lastMove.description
+              : undefined
+          }
         />
       ))}
     </div>
