@@ -11,6 +11,7 @@ import {
   countBonuses,
   toDisplayEntries,
   toGemColorEntries,
+  computeDiscountTotal,
 } from './gems';
 
 describe('gemCount', () => {
@@ -198,5 +199,35 @@ describe('toGemColorEntries', () => {
 
   it('returns empty for gold-only collection', () => {
     expect(toGemColorEntries({ Gold: 5 })).toEqual([]);
+  });
+});
+
+describe('computeDiscountTotal', () => {
+  it('returns 0 when no bonuses match', () => {
+    expect(computeDiscountTotal({ Ruby: 3 }, {})).toBe(0);
+  });
+
+  it('caps discount at card cost', () => {
+    expect(computeDiscountTotal({ Diamond: 2 }, { Diamond: 3 })).toBe(2);
+  });
+
+  it('returns partial discount when bonus < cost', () => {
+    expect(computeDiscountTotal({ Ruby: 4 }, { Ruby: 2 })).toBe(2);
+  });
+
+  it('sums discounts across multiple colors', () => {
+    expect(computeDiscountTotal({ Diamond: 2, Ruby: 3 }, { Diamond: 1, Ruby: 2 })).toBe(3);
+  });
+
+  it('returns 0 when colors do not overlap', () => {
+    expect(computeDiscountTotal({ Diamond: 3 }, { Ruby: 2 })).toBe(0);
+  });
+
+  it('returns 0 for empty card cost', () => {
+    expect(computeDiscountTotal({}, { Ruby: 2, Diamond: 1 })).toBe(0);
+  });
+
+  it('returns 0 for empty bonuses', () => {
+    expect(computeDiscountTotal({ Ruby: 3, Emerald: 2 }, {})).toBe(0);
   });
 });

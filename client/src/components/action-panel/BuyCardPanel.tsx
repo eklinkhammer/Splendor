@@ -1,5 +1,5 @@
 import type { Action, Card, CardId, ClientMessage, GemCollection, PublicGameView } from '../../types';
-import { ALL_GEM_COLORS, countBonuses, toDisplayEntries } from '../../types';
+import { countBonuses, toDisplayEntries, computeDiscountTotal } from '../../types';
 import { CardDisplay } from '../game-board/CardDisplay';
 import { GemToken } from '../game-board/GemToken';
 
@@ -19,11 +19,7 @@ function PaymentBreakdown({
 
   const self = gameView.pgvPlayers.find((p) => p.ppPlayerId === selfPlayerId);
   const bonuses = self ? countBonuses(self.ppPurchased) : {};
-  const discountTotal = ALL_GEM_COLORS.reduce((sum, c) => {
-    const cost = card.cardCost[c] ?? 0;
-    const bonus = bonuses[c] ?? 0;
-    return sum + Math.min(cost, bonus);
-  }, 0);
+  const discountTotal = computeDiscountTotal(card.cardCost, bonuses);
   const hasDiscount = discountTotal > 0;
 
   return (

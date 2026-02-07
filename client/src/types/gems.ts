@@ -59,6 +59,18 @@ export function toDisplayEntries(gc: GemCollection): [TokenType, number][] {
     .map(t => [t, gc[t]!]);
 }
 
+/** Compute total gems discounted by card bonuses */
+export function computeDiscountTotal(
+  cardCost: GemCollection,
+  bonuses: Partial<Record<GemColor, number>>,
+): number {
+  return ALL_GEM_COLORS.reduce((sum, c) => {
+    const cost = cardCost[c] ?? 0;
+    const bonus = bonuses[c] ?? 0;
+    return sum + Math.min(cost, bonus);
+  }, 0);
+}
+
 /** Display entries for gem colors only (no gold) */
 export function toGemColorEntries(gc: GemCollection): [GemColor, number][] {
   return ALL_GEM_COLORS
