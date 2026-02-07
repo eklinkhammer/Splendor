@@ -73,7 +73,7 @@ export function LobbyDetail({ lobbyId }: Props) {
   };
 
   if (!lobby) {
-    return <p className="text-gray-500">Loading lobby...</p>;
+    return <p className="text-gray-400">Loading lobby...</p>;
   }
 
   const isCreator = lobby.lobbySlots[0]?.lsSessionId === sessionId;
@@ -82,23 +82,23 @@ export function LobbyDetail({ lobbyId }: Props) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">{lobby.lobbyName}</h2>
+      <h2 className="text-lg font-semibold text-gray-100">{lobby.lobbyName}</h2>
       <div>
-        <h3 className="text-sm font-medium text-gray-600 mb-1">
+        <h3 className="text-sm font-medium text-gray-400 mb-1">
           Players ({lobby.lobbySlots.length}/{lobby.lobbyMaxPlayers})
         </h3>
         <ul className="space-y-1">
           {lobby.lobbySlots.map((slot, i) => (
-            <li key={slot.lsSessionId} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-              <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-700 text-xs rounded-full font-bold">
+            <li key={slot.lsSessionId} className="flex items-center gap-2 p-2 bg-gray-700/50 rounded">
+              <span className="w-6 h-6 flex items-center justify-center bg-blue-500/20 text-blue-300 text-xs rounded-full font-bold">
                 {i + 1}
               </span>
-              <span>{slot.lsPlayerName}</span>
+              <span className="text-gray-200">{slot.lsPlayerName}</span>
               {slot.lsIsAI && (
-                <span className="text-xs text-purple-600 font-medium">(AI)</span>
+                <span className="text-xs text-purple-400 font-medium">(AI)</span>
               )}
               {slot.lsSessionId === sessionId && (
-                <span className="text-xs text-blue-500">(you)</span>
+                <span className="text-xs text-blue-400">(you)</span>
               )}
             </li>
           ))}
@@ -125,11 +125,11 @@ export function LobbyDetail({ lobbyId }: Props) {
               {starting ? 'Starting...' : 'Start Game'}
             </button>
           ) : isCreator ? (
-            <p className="text-gray-500 text-sm text-center">
+            <p className="text-gray-400 text-sm text-center">
               Waiting for more players ({lobby.lobbyMinPlayers} minimum)...
             </p>
           ) : (
-            <p className="text-gray-500 text-sm text-center">Waiting for host to start...</p>
+            <p className="text-gray-400 text-sm text-center">Waiting for host to start...</p>
           )}
         </div>
       )}

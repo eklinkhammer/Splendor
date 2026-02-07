@@ -49,7 +49,7 @@ export function CardDisplay({ card, onClick, highlight }: Props) {
       disabled={!onClick}
       className={`w-28 h-[var(--card-height)] rounded-lg overflow-hidden flex flex-col
         border-2 transition-all duration-200
-        ${highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-300/80'}
+        ${highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-600/80'}
         ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:border-amber-300' : 'cursor-default'}
         bg-[var(--card-bg)] shadow-md`}
     >

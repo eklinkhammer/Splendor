@@ -30,20 +30,20 @@ export function HomePage() {
   }, [lobbyId, sessionId, activeLobbyId]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-900">
       <div className="max-w-xl mx-auto py-8 px-4">
-        <h1 className="text-3xl font-bold text-center mb-8">Splendor</h1>
+        <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">Splendor</h1>
 
         {activeLobbyId ? (
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-gray-800 rounded-lg shadow-lg p-6">
             <LobbyDetail lobbyId={activeLobbyId} />
           </div>
         ) : (
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-6">
               <CreateLobbyForm onCreated={setActiveLobbyId} />
             </div>
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-gray-800 rounded-lg shadow-lg p-6">
               <LobbyList
                 onSelect={(lobby) => setJoiningLobby(lobby)}
               />

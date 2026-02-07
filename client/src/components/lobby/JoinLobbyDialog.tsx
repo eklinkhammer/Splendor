@@ -35,8 +35,8 @@ export function JoinLobbyDialog({ lobby, onJoined, onCancel }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-80 shadow-xl">
-        <h3 className="text-lg font-semibold mb-1">Join {lobby.lobbyName}</h3>
+      <div className="bg-gray-800 rounded-lg p-6 w-80 shadow-xl">
+        <h3 className="text-lg font-semibold mb-1 text-gray-100">Join {lobby.lobbyName}</h3>
         <p className="text-gray-500 text-sm mb-4">
           {lobby.lobbySlots.length}/{lobby.lobbyMaxPlayers} players
         </p>
@@ -46,7 +46,7 @@ export function JoinLobbyDialog({ lobby, onJoined, onCancel }: Props) {
             placeholder="Your name"
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
             maxLength={20}
             autoFocus
           />
@@ -55,7 +55,7 @@ export function JoinLobbyDialog({ lobby, onJoined, onCancel }: Props) {
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded hover:bg-gray-100"
+              className="flex-1 px-4 py-2 border border-gray-600 rounded text-gray-300 hover:bg-gray-700"
             >
               Cancel
             </button>

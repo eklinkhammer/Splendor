@@ -2,7 +2,7 @@ import type { Noble, NobleId, GemColor } from '../../types';
 import { ALL_GEM_COLORS } from '../../types';
 
 const REQ_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-[var(--gem-diamond)] border border-gray-300 text-gray-800',
+  Diamond: 'bg-[var(--gem-diamond)] border border-gray-500 text-gray-900',
   Sapphire: 'bg-[var(--gem-sapphire)] text-white',
   Emerald: 'bg-[var(--gem-emerald)] text-white',
   Ruby: 'bg-[var(--gem-ruby)] text-white',
@@ -32,13 +32,13 @@ export function NobleRow({ nobles, onNobleClick, highlightNobles = [] }: Props) 
               onClick={onNobleClick ? () => onNobleClick(noble.nobleId) : undefined}
               disabled={!onNobleClick}
               className={`w-24 h-28 rounded-lg p-2 flex flex-col justify-between
-                bg-gradient-to-b from-amber-50 to-amber-100
+                bg-gradient-to-b from-amber-700 to-amber-800
                 border-2 transition-all duration-200 shadow-md
-                ${isHighlighted ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-amber-300/70'}
+                ${isHighlighted ? 'border-amber-400 shadow-lg shadow-amber-400/30' : 'border-amber-600/70'}
                 ${onNobleClick ? 'cursor-pointer hover:border-amber-400 hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default'}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-lg font-extrabold text-purple-800">{noble.noblePrestige}</span>
+                <span className="text-lg font-extrabold text-purple-200">{noble.noblePrestige}</span>
                 <span className="text-sm">👑</span>
               </div>
               <div className="flex gap-1 justify-center">

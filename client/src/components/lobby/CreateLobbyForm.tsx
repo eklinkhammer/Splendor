@@ -33,13 +33,13 @@ export function CreateLobbyForm({ onCreated }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <h2 className="text-lg font-semibold">Create a Game</h2>
+      <h2 className="text-lg font-semibold text-gray-100">Create a Game</h2>
       <input
         type="text"
         placeholder="Your name"
         value={playerName}
         onChange={(e) => setPlayerName(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
         maxLength={20}
       />
       <input
@@ -47,7 +47,7 @@ export function CreateLobbyForm({ onCreated }: Props) {
         placeholder="Lobby name"
         value={lobbyName}
         onChange={(e) => setLobbyName(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
         maxLength={30}
       />
       {error && <p className="text-red-500 text-sm">{error}</p>}

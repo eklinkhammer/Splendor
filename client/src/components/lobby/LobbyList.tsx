@@ -33,20 +33,20 @@ export function LobbyList({ onSelect }: Props) {
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-2">Open Lobbies</h2>
+      <h2 className="text-lg font-semibold mb-2 text-gray-100">Open Lobbies</h2>
       {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
       {lobbies.length === 0 ? (
-        <p className="text-gray-500 text-sm">No open lobbies. Create one above!</p>
+        <p className="text-gray-400 text-sm">No open lobbies. Create one above!</p>
       ) : (
         <ul className="space-y-2">
           {lobbies.map((lobby) => (
             <li
               key={lobby.lobbyId}
-              className="flex items-center justify-between p-3 border border-gray-200 rounded hover:bg-gray-50"
+              className="flex items-center justify-between p-3 border border-gray-600 rounded hover:bg-gray-700"
             >
               <div>
-                <span className="font-medium">{lobby.lobbyName}</span>
-                <span className="text-gray-500 text-sm ml-2">
+                <span className="font-medium text-gray-100">{lobby.lobbyName}</span>
+                <span className="text-gray-400 text-sm ml-2">
                   {lobby.lobbySlots.length}/{lobby.lobbyMaxPlayers} players
                 </span>
               </div>
