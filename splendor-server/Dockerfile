@@ -8,7 +8,13 @@ COPY splendor-core/splendor-core.cabal splendor-core/
 COPY splendor-ai/splendor-ai.cabal splendor-ai/
 COPY splendor-server/splendor-server.cabal splendor-server/
 
-RUN cabal update && cabal build --only-dependencies splendor-server
+# Create placeholder source dirs so cabal can configure local packages
+# during the dependency-only build (real sources are copied later)
+RUN mkdir -p splendor-core/src splendor-core/test \
+             splendor-ai/src splendor-ai/test \
+             splendor-server/src splendor-server/app splendor-server/test
+
+RUN cabal update && cabal build --only-dependencies splendor-server || true
 
 # Copy source code
 COPY splendor-core/ splendor-core/
