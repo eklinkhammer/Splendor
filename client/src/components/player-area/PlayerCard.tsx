@@ -4,7 +4,7 @@ import { GemToken } from '../game-board/GemToken';
 import { CardDisplay } from '../game-board/CardDisplay';
 
 const BONUS_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-[var(--gem-diamond)] border border-gray-300 text-gray-800',
+  Diamond: 'bg-[var(--gem-diamond)] border border-gray-500 text-gray-900',
   Sapphire: 'bg-[var(--gem-sapphire)] text-white',
   Emerald: 'bg-[var(--gem-emerald)] text-white',
   Ruby: 'bg-[var(--gem-ruby)] text-white',
@@ -33,7 +33,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
 
   return (
     <div className={`rounded-xl overflow-hidden shadow-md transition-all duration-200
-      ${isActive ? 'ring-2 ring-green-400 shadow-green-200/50' : 'ring-1 ring-gray-200'}`}
+      ${isActive ? 'ring-2 ring-green-400 shadow-green-500/20' : 'ring-1 ring-gray-600'}`}
     >
       {/* Header bar */}
       <div className={`px-4 py-2.5 flex items-center justify-between
@@ -49,7 +49,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
       </div>
 
       {/* Body */}
-      <div className={`p-3 space-y-2.5 ${isActive ? 'bg-green-50' : 'bg-white'}`}>
+      <div className={`p-3 space-y-2.5 ${isActive ? 'bg-green-900/30' : 'bg-gray-800'}`}>
         {/* Tokens */}
         {hasTokens && (
           <div>
@@ -94,8 +94,8 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
               {player.ppNobles.map((noble) => (
                 <div
                   key={noble.nobleId}
-                  className="w-7 h-7 rounded-md bg-gradient-to-b from-amber-100 to-amber-200 border border-amber-300
-                    flex items-center justify-center text-xs font-bold text-purple-800 shadow-sm"
+                  className="w-7 h-7 rounded-md bg-gradient-to-b from-amber-600 to-amber-700 border border-amber-500/50
+                    flex items-center justify-center text-xs font-bold text-white shadow-sm"
                   title={`Noble: ${noble.noblePrestige} VP`}
                 >
                   👑
@@ -110,7 +110,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Reserved</span>
-              <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-1.5 rounded-full">
+              <span className="text-[10px] bg-gray-600 text-gray-300 font-bold px-1.5 rounded-full">
                 {player.ppReserved.length}
               </span>
             </div>
@@ -128,9 +128,9 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick }: Pr
 
         {/* Reserved count (opponent) */}
         {!isSelf && player.ppReservedCount > 0 && (
-          <div className="text-xs text-gray-500 flex items-center gap-1">
+          <div className="text-xs text-gray-400 flex items-center gap-1">
             Reserved
-            <span className="bg-gray-200 text-gray-600 font-bold px-1.5 rounded-full text-[10px]">
+            <span className="bg-gray-600 text-gray-300 font-bold px-1.5 rounded-full text-[10px]">
               {player.ppReservedCount}
             </span>
           </div>

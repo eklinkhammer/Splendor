@@ -69,14 +69,14 @@ export function GamePage() {
 
   if (!gameView) {
     return (
-      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
-        <p className="text-gray-500">Connecting to game...</p>
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <p className="text-gray-400">Connecting to game...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-200 p-4">
+    <div className="min-h-screen bg-gray-900 p-4">
       <div className="max-w-6xl mx-auto">
         {!connected && (
           <div className="mb-2 px-4 py-2 bg-gradient-to-r from-amber-500/90 to-yellow-500/90 text-white text-sm font-medium rounded-xl shadow-md flex items-center justify-center gap-2">
