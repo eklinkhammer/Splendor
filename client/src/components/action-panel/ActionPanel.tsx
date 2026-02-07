@@ -11,13 +11,14 @@ interface Props {
   gameView: PublicGameView;
   selfPlayerId: string | null;
   send: (msg: ClientMessage) => void;
+  selectedCardId: CardId | null;
+  onClearSelection: () => void;
 }
 
-export function ActionPanel({ gameView, selfPlayerId, send }: Props) {
+export function ActionPanel({ gameView, selfPlayerId, send, selectedCardId, onClearSelection }: Props) {
   const legalActions = useGameStore((s) => s.legalActions);
   const gemReturnInfo = useGameStore((s) => s.gemReturnInfo);
   const nobleChoices = useGameStore((s) => s.nobleChoices);
-  const [selectedCardId, setSelectedCardId] = useState<CardId | null>(null);
 
   const currentPlayer = gameView.pgvPlayers[gameView.pgvCurrentPlayer];
   const isMyTurn = currentPlayer?.ppPlayerId === selfPlayerId;
@@ -56,8 +57,6 @@ export function ActionPanel({ gameView, selfPlayerId, send }: Props) {
     );
   }
 
-  const clearSelection = () => setSelectedCardId(null);
-
   return (
     <div className="space-y-4">
       <TakeGemsPanel
@@ -71,13 +70,13 @@ export function ActionPanel({ gameView, selfPlayerId, send }: Props) {
         selfPlayerId={selfPlayerId}
         selectedCardId={selectedCardId}
         send={send}
-        onClearSelection={clearSelection}
+        onClearSelection={onClearSelection}
       />
       <ReserveCardPanel
         legalActions={legalActions}
         selectedCardId={selectedCardId}
         send={send}
-        onClearSelection={clearSelection}
+        onClearSelection={onClearSelection}
       />
     </div>
   );

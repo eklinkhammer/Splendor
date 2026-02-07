@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useSessionStore } from '../stores/sessionStore';
@@ -45,10 +45,14 @@ export function GamePage() {
   const { send } = useGameSocket(id ?? null, sessionId);
 
   const {
+    selectedCardId,
+    setSelectedCardId,
     highlightCards,
     onCardClick,
     onDeckClick,
   } = useActionCallbacks(send);
+
+  const clearSelection = useCallback(() => setSelectedCardId(null), [setSelectedCardId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -93,6 +97,8 @@ export function GamePage() {
                 gameView={gameView}
                 selfPlayerId={selfPlayerId}
                 send={send}
+                selectedCardId={selectedCardId}
+                onClearSelection={clearSelection}
               />
             </div>
           </div>
