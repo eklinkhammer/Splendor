@@ -1,20 +1,36 @@
 import type { Card, GemColor } from '../../types';
 import { ALL_GEM_COLORS } from '../../types';
 
-const BONUS_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-white border-gray-300',
-  Sapphire: 'bg-blue-600',
-  Emerald: 'bg-green-600',
-  Ruby: 'bg-red-600',
-  Onyx: 'bg-gray-800',
+const HEADER_GRADIENTS: Record<GemColor, string> = {
+  Diamond: 'from-gray-100 to-gray-300',
+  Sapphire: 'from-blue-400 to-blue-700',
+  Emerald: 'from-green-400 to-green-700',
+  Ruby: 'from-red-400 to-red-700',
+  Onyx: 'from-gray-600 to-gray-900',
 };
 
-const COST_DOT_COLORS: Record<GemColor, string> = {
-  Diamond: 'bg-white border border-gray-400 text-gray-800',
+const BONUS_COLORS: Record<GemColor, string> = {
+  Diamond: 'bg-white border border-gray-300 shadow-inner',
+  Sapphire: 'bg-blue-500 border border-blue-300',
+  Emerald: 'bg-green-500 border border-green-300',
+  Ruby: 'bg-red-500 border border-red-300',
+  Onyx: 'bg-gray-700 border border-gray-500',
+};
+
+const COST_PILL_COLORS: Record<GemColor, string> = {
+  Diamond: 'bg-white border border-gray-300 text-gray-800',
   Sapphire: 'bg-blue-600 text-white',
   Emerald: 'bg-green-600 text-white',
   Ruby: 'bg-red-600 text-white',
   Onyx: 'bg-gray-800 text-white',
+};
+
+const PRESTIGE_TEXT: Record<GemColor, string> = {
+  Diamond: 'text-gray-700',
+  Sapphire: 'text-white',
+  Emerald: 'text-white',
+  Ruby: 'text-white',
+  Onyx: 'text-white',
 };
 
 interface Props {
@@ -31,28 +47,35 @@ export function CardDisplay({ card, onClick, highlight }: Props) {
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`w-24 h-32 border-2 rounded-lg p-1.5 flex flex-col justify-between
-        ${highlight ? 'border-blue-400 shadow-lg shadow-blue-200' : 'border-gray-300'}
-        ${onClick ? 'cursor-pointer hover:border-blue-300 hover:shadow-md transition-all' : 'cursor-default'}
-        bg-gray-50`}
+      className={`w-28 h-[156px] rounded-lg overflow-hidden flex flex-col
+        border-2 transition-all duration-200
+        ${highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-300/80'}
+        ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:border-amber-300' : 'cursor-default'}
+        bg-amber-50 shadow-md`}
     >
-      {/* Top: prestige + bonus */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-gray-700">
+      {/* Header band with gradient */}
+      <div className={`relative h-[46px] w-full bg-gradient-to-br ${HEADER_GRADIENTS[card.cardBonus]} flex items-start justify-between px-2 pt-1.5`}>
+        {/* Prestige number */}
+        <span className={`text-xl font-extrabold drop-shadow-sm ${PRESTIGE_TEXT[card.cardBonus]}`}>
           {card.cardPrestige > 0 ? card.cardPrestige : ''}
         </span>
-        <div className={`w-5 h-5 rounded-full border ${BONUS_COLORS[card.cardBonus]}`} />
+        {/* Bonus gem circle */}
+        <div className={`w-7 h-7 rounded-full ${BONUS_COLORS[card.cardBonus]} flex items-center justify-center shadow-sm`}>
+          <div className="w-3 h-3 rounded-full bg-white/30" />
+        </div>
       </div>
 
-      {/* Bottom: cost */}
-      <div className="flex flex-col gap-0.5 items-start">
-        {costEntries.map((color) => (
-          <div key={color} className="flex items-center gap-1">
-            <div className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center font-bold ${COST_DOT_COLORS[color]}`}>
-              {card.cardCost[color]}
+      {/* Card body with cost */}
+      <div className="flex-1 p-1.5 flex flex-col justify-end">
+        <div className="flex flex-col gap-0.5">
+          {costEntries.map((color) => (
+            <div key={color} className="flex items-center gap-1">
+              <div className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold shadow-sm ${COST_PILL_COLORS[color]}`}>
+                {card.cardCost[color]}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </button>
   );

@@ -16,14 +16,35 @@ export function GameStatus({ gameView, selfPlayerId }: Props) {
         ? 'Game Over'
         : '';
 
+  const phaseBadge =
+    gameView.pgvPhase.tag === 'FinalRound'
+      ? 'bg-amber-500 text-amber-950'
+      : gameView.pgvPhase.tag === 'Finished'
+        ? 'bg-red-500 text-white'
+        : '';
+
   return (
-    <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-white rounded-lg">
-      <span className="text-sm">Turn {gameView.pgvTurnNumber}</span>
-      <span className={`font-semibold ${isMyTurn ? 'text-green-400' : ''}`}>
-        {isMyTurn ? 'Your Turn' : `${currentPlayer?.ppPlayerName ?? '?'}'s Turn`}
+    <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-gray-800 to-gray-900 text-white rounded-xl shadow-lg">
+      <span className="text-sm bg-gray-700 px-3 py-1 rounded-full font-medium">
+        Turn {gameView.pgvTurnNumber}
       </span>
-      {phaseLabel && (
-        <span className="text-sm text-yellow-400 font-medium">{phaseLabel}</span>
+      <div className="flex items-center gap-2">
+        {isMyTurn && (
+          <span className="relative flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+          </span>
+        )}
+        <span className={`text-lg font-bold ${isMyTurn ? 'text-green-400' : ''}`}>
+          {isMyTurn ? 'Your Turn' : `${currentPlayer?.ppPlayerName ?? '?'}'s Turn`}
+        </span>
+      </div>
+      {phaseLabel ? (
+        <span className={`text-sm font-bold px-3 py-1 rounded-full ${phaseBadge}`}>
+          {phaseLabel}
+        </span>
+      ) : (
+        <span className="w-24" />
       )}
     </div>
   );

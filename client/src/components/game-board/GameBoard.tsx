@@ -17,29 +17,42 @@ export function GameBoard({
   highlightCards,
 }: Props) {
   return (
-    <div className="space-y-3">
+    <div className="bg-[var(--board-felt)] rounded-xl p-6 shadow-inner space-y-4">
+      {/* Nobles section */}
       <NobleRow nobles={board.publicNobles} />
-      <TierRow
-        tier="Tier3"
-        row={board.publicTier3}
-        onCardClick={onCardClick}
-        onDeckClick={onDeckClick ? () => onDeckClick('Tier3') : undefined}
-        highlightCards={highlightCards}
-      />
-      <TierRow
-        tier="Tier2"
-        row={board.publicTier2}
-        onCardClick={onCardClick}
-        onDeckClick={onDeckClick ? () => onDeckClick('Tier2') : undefined}
-        highlightCards={highlightCards}
-      />
-      <TierRow
-        tier="Tier1"
-        row={board.publicTier1}
-        onCardClick={onCardClick}
-        onDeckClick={onDeckClick ? () => onDeckClick('Tier1') : undefined}
-        highlightCards={highlightCards}
-      />
+
+      {/* Divider */}
+      <div className="border-t border-white/10" />
+
+      {/* Card tiers */}
+      <div className="space-y-3">
+        <TierRow
+          tier="Tier3"
+          row={board.publicTier3}
+          onCardClick={onCardClick}
+          onDeckClick={onDeckClick ? () => onDeckClick('Tier3') : undefined}
+          highlightCards={highlightCards}
+        />
+        <TierRow
+          tier="Tier2"
+          row={board.publicTier2}
+          onCardClick={onCardClick}
+          onDeckClick={onDeckClick ? () => onDeckClick('Tier2') : undefined}
+          highlightCards={highlightCards}
+        />
+        <TierRow
+          tier="Tier1"
+          row={board.publicTier1}
+          onCardClick={onCardClick}
+          onDeckClick={onDeckClick ? () => onDeckClick('Tier1') : undefined}
+          highlightCards={highlightCards}
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-white/10" />
+
+      {/* Gem bank */}
       <GemBank bank={board.publicBank} />
     </div>
   );

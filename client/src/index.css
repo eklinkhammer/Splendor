@@ -1,1 +1,15 @@
 @import "tailwindcss";
+
+/* Gem palette — used across cards, tokens, and player area */
+:root {
+  --gem-diamond: #e8e8e8;
+  --gem-sapphire: #2563eb;
+  --gem-emerald: #16a34a;
+  --gem-ruby: #dc2626;
+  --gem-onyx: #1f2937;
+  --gem-gold: #eab308;
+
+  --board-felt: #1a5c2a;
+  --board-felt-light: #236b35;
+  --card-bg: #fefce8;
+}

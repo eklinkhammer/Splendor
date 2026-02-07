@@ -69,17 +69,17 @@ export function GamePage() {
 
   if (!gameView) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-200 flex items-center justify-center">
         <p className="text-gray-500">Connecting to game...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
+    <div className="min-h-screen bg-gray-200 p-4">
       <div className="max-w-6xl mx-auto">
         {!connected && (
-          <div className="mb-2 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded text-center">
+          <div className="mb-2 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-lg text-center">
             Reconnecting...
           </div>
         )}
@@ -91,14 +91,14 @@ export function GamePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
-          <div className="bg-white rounded-lg shadow p-4">
+          <div>
             <GameBoard
               board={gameView.pgvBoard}
               onCardClick={onCardClick}
               onDeckClick={onDeckClick}
               highlightCards={highlightCards}
             />
-            <div className="mt-4 border-t pt-4">
+            <div className="mt-4 bg-white rounded-xl p-4 shadow-md">
               <ActionPanel
                 gameView={gameView}
                 selfPlayerId={selfPlayerId}

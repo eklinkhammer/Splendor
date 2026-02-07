@@ -1,10 +1,22 @@
 import type { PublicTierRow, Tier, CardId } from '../../types';
 import { CardDisplay } from './CardDisplay';
 
-const TIER_COLORS: Record<Tier, string> = {
-  Tier1: 'bg-green-100 text-green-800',
-  Tier2: 'bg-yellow-100 text-yellow-800',
-  Tier3: 'bg-blue-100 text-blue-800',
+const TIER_DECK_STYLES: Record<Tier, string> = {
+  Tier1: 'from-green-600 to-green-800 border-green-500',
+  Tier2: 'from-amber-500 to-amber-700 border-amber-400',
+  Tier3: 'from-indigo-500 to-indigo-800 border-indigo-400',
+};
+
+const TIER_BADGE_STYLES: Record<Tier, string> = {
+  Tier1: 'bg-green-400 text-green-900',
+  Tier2: 'bg-amber-300 text-amber-900',
+  Tier3: 'bg-indigo-300 text-indigo-900',
+};
+
+const TIER_LABELS: Record<Tier, string> = {
+  Tier1: 'I',
+  Tier2: 'II',
+  Tier3: 'III',
 };
 
 interface Props {
@@ -18,17 +30,24 @@ interface Props {
 export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [] }: Props) {
   return (
     <div className="flex items-center gap-2">
+      {/* Tier label */}
+      <div className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-extrabold ${TIER_BADGE_STYLES[tier]}`}>
+        {TIER_LABELS[tier]}
+      </div>
+
       {/* Deck */}
       <button
         type="button"
         onClick={onDeckClick}
         disabled={!onDeckClick || row.publicDeckCount === 0}
-        className={`w-24 h-32 rounded-lg border-2 border-dashed flex flex-col items-center justify-center
-          ${TIER_COLORS[tier]}
-          ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:border-blue-400' : 'cursor-default opacity-60'}`}
+        className={`w-28 h-[156px] rounded-lg border-2 flex flex-col items-center justify-center
+          bg-gradient-to-br ${TIER_DECK_STYLES[tier]} shadow-md
+          ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:shadow-lg hover:brightness-110 transition-all' : 'cursor-default opacity-60'}`}
       >
-        <span className="text-2xl font-bold">{row.publicDeckCount}</span>
-        <span className="text-xs">{tier.replace('Tier', 'Tier ')}</span>
+        <span className="text-3xl font-bold text-white/90 drop-shadow-sm">{row.publicDeckCount}</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${TIER_BADGE_STYLES[tier]}`}>
+          {tier.replace('Tier', 'Tier ')}
+        </span>
       </button>
 
       {/* Display cards */}
@@ -43,7 +62,7 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
 
       {/* Empty slots */}
       {Array.from({ length: Math.max(0, 4 - row.publicDisplay.length) }).map((_, i) => (
-        <div key={`empty-${i}`} className="w-24 h-32 rounded-lg border-2 border-dashed border-gray-200" />
+        <div key={`empty-${i}`} className="w-28 h-[156px] rounded-lg border-2 border-dashed border-white/20 bg-white/5" />
       ))}
     </div>
   );

@@ -1,12 +1,12 @@
 import type { TokenType } from '../../types';
 
 const TOKEN_STYLES: Record<TokenType, string> = {
-  Diamond: 'bg-white border-gray-300 text-gray-800',
-  Sapphire: 'bg-blue-600 border-blue-700 text-white',
-  Emerald: 'bg-green-600 border-green-700 text-white',
-  Ruby: 'bg-red-600 border-red-700 text-white',
-  Onyx: 'bg-gray-800 border-gray-900 text-white',
-  Gold: 'bg-yellow-400 border-yellow-500 text-gray-800',
+  Diamond: 'bg-gradient-to-br from-white to-gray-200 border-gray-300 text-gray-800',
+  Sapphire: 'bg-gradient-to-br from-blue-500 to-blue-700 border-blue-800 text-white',
+  Emerald: 'bg-gradient-to-br from-green-500 to-green-700 border-green-800 text-white',
+  Ruby: 'bg-gradient-to-br from-red-500 to-red-700 border-red-800 text-white',
+  Onyx: 'bg-gradient-to-br from-gray-700 to-gray-900 border-gray-950 text-white',
+  Gold: 'bg-gradient-to-br from-yellow-300 to-yellow-500 border-yellow-600 text-gray-800',
 };
 
 interface Props {
@@ -18,19 +18,20 @@ interface Props {
 }
 
 export function GemToken({ token, count, onClick, selected, size = 'md' }: Props) {
-  const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-10 h-10 text-sm';
+  const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-base';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!onClick}
       className={`${sizeClass} rounded-full border-2 font-bold flex items-center justify-center
+        shadow-md ring-1 ring-inset ring-white/30 relative
         ${TOKEN_STYLES[token]}
-        ${selected ? 'ring-2 ring-offset-1 ring-blue-400' : ''}
-        ${onClick ? 'cursor-pointer hover:scale-110 transition-transform' : 'cursor-default'}`}
+        ${selected ? 'ring-2 ring-amber-400 ring-offset-2' : ''}
+        ${onClick ? 'cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-150' : 'cursor-default'}`}
       title={`${token}: ${count}`}
     >
-      {count}
+      <span className="drop-shadow-sm">{count}</span>
     </button>
   );
 }
