@@ -88,13 +88,16 @@ export function TakeGemsPanel({ legalActions, board, send }: Props) {
   if (takeDiffActions.length === 0 && takeTwoActions.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold text-gray-700">Take Gems</h3>
+    <div className="bg-gray-700/50 rounded-xl p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">Take Gems</span>
+        <span className="flex-1 border-t border-white/10" />
+      </div>
 
       {/* Take different */}
       {takeDiffActions.length > 0 && (
         <div>
-          <p className="text-xs text-gray-500 mb-1">Select different colors (up to 3):</p>
+          <p className="text-xs text-gray-400 mb-1">Select different colors (up to 3):</p>
           <div className="flex gap-2 items-center">
             {ALL_GEM_COLORS.map((color) => {
               const bankCount = board.publicBank[color] ?? 0;
@@ -113,7 +116,7 @@ export function TakeGemsPanel({ legalActions, board, send }: Props) {
             <button
               onClick={handleTakeDifferent}
               disabled={!isValidSelection}
-              className="ml-2 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="ml-2 px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm rounded-xl font-semibold shadow-md transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Take
             </button>
@@ -124,13 +127,13 @@ export function TakeGemsPanel({ legalActions, board, send }: Props) {
       {/* Take two same */}
       {takeTwoActions.length > 0 && (
         <div>
-          <p className="text-xs text-gray-500 mb-1">Take 2 of same color:</p>
+          <p className="text-xs text-gray-400 mb-1">Take 2 of same color:</p>
           <div className="flex gap-2">
             {ALL_GEM_COLORS.filter((c) => availableTwoColors.has(c)).map((color) => (
               <button
                 key={color}
                 onClick={() => handleTakeTwo(color)}
-                className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                className="px-2 py-1 text-xs bg-gray-600/80 border border-gray-500/50 rounded-xl text-gray-200 transition-all duration-200 hover:bg-gray-500/80 hover:shadow-lg flex items-center gap-1"
               >
                 2x
                 <GemToken token={color} count={board.publicBank[color] ?? 0} size="sm" />

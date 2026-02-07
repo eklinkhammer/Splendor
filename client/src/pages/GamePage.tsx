@@ -79,7 +79,11 @@ export function GamePage() {
     <div className="min-h-screen bg-gray-200 p-4">
       <div className="max-w-6xl mx-auto">
         {!connected && (
-          <div className="mb-2 px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-lg text-center">
+          <div className="mb-2 px-4 py-2 bg-gradient-to-r from-amber-500/90 to-yellow-500/90 text-white text-sm font-medium rounded-xl shadow-md flex items-center justify-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+            </span>
             Reconnecting...
           </div>
         )}
@@ -98,7 +102,7 @@ export function GamePage() {
               onDeckClick={onDeckClick}
               highlightCards={highlightCards}
             />
-            <div className="mt-4 bg-white rounded-xl p-4 shadow-md">
+            <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
               <ActionPanel
                 gameView={gameView}
                 selfPlayerId={selfPlayerId}

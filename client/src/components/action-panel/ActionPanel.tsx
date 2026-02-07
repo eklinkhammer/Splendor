@@ -43,22 +43,35 @@ export function ActionPanel({ gameView, selfPlayerId, send, selectedCardId, onCl
 
   if (!isMyTurn) {
     return (
-      <div className="text-center text-gray-500 py-4">
-        Waiting for {currentPlayer?.ppPlayerName ?? '...'}...
+      <div className="text-center py-4 space-y-1">
+        <div className="flex items-center justify-center gap-2 text-gray-300">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-gray-400" />
+          </span>
+          Waiting for {currentPlayer?.ppPlayerName ?? '...'}
+        </div>
+        <p className="text-xs text-gray-500">Their turn is in progress</p>
       </div>
     );
   }
 
   if (legalActions.length === 0) {
     return (
-      <div className="text-center text-gray-500 py-4">
-        Waiting for server...
+      <div className="text-center py-4">
+        <div className="flex items-center justify-center gap-2 text-gray-300">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-400" />
+          </span>
+          Loading actions...
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <TakeGemsPanel
         legalActions={legalActions}
         board={gameView.pgvBoard}

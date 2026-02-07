@@ -45,11 +45,15 @@ export function GemReturnPanel({ amount, options, playerTokens, send }: Props) {
   };
 
   return (
-    <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg space-y-2">
-      <h3 className="text-sm font-semibold text-orange-800">
-        Return {amount} gem{amount > 1 ? 's' : ''}
-      </h3>
-      <p className="text-xs text-orange-600">
+    <div className="bg-gradient-to-b from-orange-900/60 to-orange-950/60 border border-orange-500/40 rounded-xl p-4 shadow-lg space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center justify-center w-5 h-5 bg-orange-500/30 rounded-full text-xs font-bold text-orange-300">!</span>
+        <h3 className="text-sm font-bold text-orange-300">
+          Return {amount} gem{amount > 1 ? 's' : ''}
+        </h3>
+        <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-orange-500/20 text-orange-300 rounded-full border border-orange-500/30">Required</span>
+      </div>
+      <p className="text-xs text-orange-200/80">
         You have too many tokens. Select {amount} to return.
       </p>
 
@@ -68,9 +72,9 @@ export function GemReturnPanel({ amount, options, playerTokens, send }: Props) {
               {ret > 0 && (
                 <button
                   onClick={() => handleUndo(token)}
-                  className="text-xs text-orange-700 underline"
+                  className="text-xs text-orange-400 hover:text-orange-300 transition-colors duration-200"
                 >
-                  -{ret}
+                  undo ({ret})
                 </button>
               )}
             </div>
@@ -82,13 +86,13 @@ export function GemReturnPanel({ amount, options, playerTokens, send }: Props) {
         <button
           onClick={handleSubmit}
           disabled={!isValid}
-          className="px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white text-sm rounded-xl font-semibold shadow-md transition-all duration-200 hover:from-orange-600 hover:to-orange-700 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Return ({returnedTotal}/{amount})
         </button>
         <button
           onClick={() => setReturning(emptyGemCollection())}
-          className="px-3 py-1 border border-gray-300 text-sm rounded hover:bg-gray-100"
+          className="px-4 py-1.5 border border-gray-500/50 text-gray-300 text-sm rounded-xl font-medium transition-all duration-200 hover:bg-gray-600/50"
         >
           Reset
         </button>

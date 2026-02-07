@@ -52,24 +52,27 @@ export function BuyCardPanel({ legalActions, gameView, selfPlayerId, selectedCar
   };
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700">Buy a Card</h3>
+    <div className="bg-gray-700/50 rounded-xl p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-blue-400">Buy a Card</span>
+        <span className="flex-1 border-t border-white/10" />
+      </div>
 
       {selectedCard && selectedAction ? (
-        <div className="flex items-center gap-3 p-2 bg-blue-50 rounded">
+        <div className="flex items-center gap-3 p-2 bg-blue-900/40 border border-blue-500/30 rounded-xl">
           <CardDisplay card={selectedCard} />
           <div className="flex-1">
-            <p className="text-sm font-medium">Buy this card?</p>
+            <p className="text-sm font-medium text-gray-100">Buy this card?</p>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={handleBuy}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm rounded-xl font-semibold shadow-md transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg"
               >
                 Buy
               </button>
               <button
                 onClick={onClearSelection}
-                className="px-3 py-1 border border-gray-300 text-sm rounded hover:bg-gray-100"
+                className="px-4 py-1.5 border border-gray-500/50 text-gray-300 text-sm rounded-xl font-medium transition-all duration-200 hover:bg-gray-600/50"
               >
                 Cancel
               </button>
@@ -77,7 +80,7 @@ export function BuyCardPanel({ legalActions, gameView, selfPlayerId, selectedCar
           </div>
         </div>
       ) : (
-        <p className="text-xs text-gray-500">Click a highlighted card to buy it.</p>
+        <p className="text-xs text-gray-400">Click a highlighted card to buy it.</p>
       )}
     </div>
   );

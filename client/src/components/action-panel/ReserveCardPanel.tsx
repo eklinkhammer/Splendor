@@ -42,20 +42,23 @@ export function ReserveCardPanel({ legalActions, selectedCardId, send, onClearSe
   };
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-gray-700">Reserve a Card</h3>
+    <div className="bg-gray-700/50 rounded-xl p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">Reserve a Card</span>
+        <span className="flex-1 border-t border-white/10" />
+      </div>
 
       {displayReserveAction && selectedCardId && (
         <div className="flex gap-2 items-center">
           <button
             onClick={handleReserveDisplay}
-            className="px-3 py-1 bg-yellow-500 text-white text-sm rounded hover:bg-yellow-600"
+            className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-600 text-white text-sm rounded-xl font-semibold shadow-md transition-all duration-200 hover:from-amber-600 hover:to-yellow-700 hover:shadow-lg"
           >
             Reserve Selected Card
           </button>
           <button
             onClick={onClearSelection}
-            className="px-3 py-1 border border-gray-300 text-sm rounded hover:bg-gray-100"
+            className="px-4 py-1.5 border border-gray-500/50 text-gray-300 text-sm rounded-xl font-medium transition-all duration-200 hover:bg-gray-600/50"
           >
             Cancel
           </button>
@@ -64,13 +67,13 @@ export function ReserveCardPanel({ legalActions, selectedCardId, send, onClearSe
 
       {deckReserveActions.length > 0 && (
         <div>
-          <p className="text-xs text-gray-500 mb-1">Reserve from deck:</p>
+          <p className="text-xs text-gray-400 mb-1">Reserve from deck:</p>
           <div className="flex gap-2">
             {deckReserveActions.map((a) => (
               <button
                 key={a.contents.contents}
                 onClick={() => handleReserveDeck(a.contents.contents)}
-                className="px-2 py-1 text-xs border rounded hover:bg-gray-100"
+                className="px-2 py-1 text-xs bg-gray-600/80 border border-gray-500/50 rounded-xl text-gray-200 transition-all duration-200 hover:bg-gray-500/80 hover:shadow-lg"
               >
                 {a.contents.contents.replace('Tier', 'Tier ')}
               </button>
