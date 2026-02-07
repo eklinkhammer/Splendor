@@ -25,9 +25,9 @@ export function GemToken({ token, count, onClick, selected, size = 'md' }: Props
       onClick={onClick}
       disabled={!onClick}
       className={`${sizeClass} rounded-full border-2 font-bold flex items-center justify-center
-        shadow-md ring-1 ring-inset ring-white/30 relative
+        shadow-md relative
         ${TOKEN_STYLES[token]}
-        ${selected ? 'ring-2 ring-amber-400 ring-offset-2' : ''}
+        ${selected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900' : 'ring-1 ring-inset ring-white/30'}
         ${onClick ? 'cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-150' : 'cursor-default'}`}
       title={`${token}: ${count}`}
     >
