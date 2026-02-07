@@ -7,10 +7,13 @@ interface Props {
   result: GameResult;
 }
 
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
 export function GameOverOverlay({ result }: Props) {
   const navigate = useNavigate();
   const clearSession = useSessionStore((s) => s.clear);
   const resetGame = useGameStore((s) => s.reset);
+  const gameView = useGameStore((s) => s.gameView);
 
   const handleReturn = () => {
     resetGame();
@@ -18,22 +21,53 @@ export function GameOverOverlay({ result }: Props) {
     navigate('/');
   };
 
+  const rankedPlayers = gameView
+    ? [...gameView.pgvPlayers].sort(
+        (a, b) => b.ppPrestige - a.ppPrestige || b.ppPurchased.length - a.ppPurchased.length,
+      )
+    : [];
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-10 shadow-2xl text-center max-w-sm border border-amber-500/30">
+      <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-10 shadow-2xl text-center max-w-md border border-amber-500/30">
         <div className="text-5xl mb-3">🏆</div>
         <h2 className="text-2xl font-extrabold text-gray-100 mb-2">Game Over!</h2>
-        <p className="text-xl mb-1 text-gray-200">
+        <p className="text-xl mb-6 text-gray-200">
           <span className="font-bold bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">
             {result.winnerName}
           </span>{' '}
           wins!
         </p>
-        <p className="mb-8">
-          <span className="inline-flex items-center gap-1 bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold px-3 py-1 rounded-full text-sm">
-            {result.finalPrestige} prestige points
-          </span>
-        </p>
+
+        <div className="space-y-2 mb-8 text-left">
+          {rankedPlayers.map((player, idx) => {
+            const isWinner = idx === 0;
+            const medal = RANK_MEDALS[idx] ?? `#${idx + 1}`;
+            return (
+              <div
+                key={player.ppPlayerId}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl ${
+                  isWinner
+                    ? 'bg-amber-500/10 border border-amber-500/30 ring-1 ring-amber-400/30'
+                    : 'bg-gray-700/50'
+                }`}
+              >
+                <span className="text-lg w-8 text-center">{medal}</span>
+                <span className="font-bold text-gray-200 flex-1 truncate">{player.ppPlayerName}</span>
+                <span className="bg-purple-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {player.ppPrestige} VP
+                </span>
+                <span className="text-xs text-gray-400">
+                  {player.ppPurchased.length} card{player.ppPurchased.length !== 1 ? 's' : ''}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {player.ppNobles.length} noble{player.ppNobles.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
         <button
           onClick={handleReturn}
           className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl
