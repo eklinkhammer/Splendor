@@ -8,9 +8,14 @@ import type {
   ServerMessage,
   PlayerId,
 } from '../types';
+import { computeMoveLogEntry } from '../utils/moveLog';
+import type { MoveLogEntry } from '../utils/moveLog';
 
 interface GameState {
   gameView: PublicGameView | null;
+  previousGameView: PublicGameView | null;
+  moveLog: MoveLogEntry[];
+  lastMove: { playerId: PlayerId; description: string } | null;
   legalActions: Action[];
   gemReturnInfo: { amount: number; options: GemCollection[] } | null;
   nobleChoices: Noble[] | null;
@@ -27,6 +32,9 @@ interface GameState {
 
 export const useGameStore = create<GameState>()((set, get) => ({
   gameView: null,
+  previousGameView: null,
+  moveLog: [],
+  lastMove: null,
   legalActions: [],
   gemReturnInfo: null,
   nobleChoices: null,
@@ -49,10 +57,27 @@ export const useGameStore = create<GameState>()((set, get) => ({
             selfId = selfPlayer.ppPlayerId;
           }
         }
+
+        const prev = get().previousGameView;
+        let newMoveLog = get().moveLog;
+        let newLastMove = get().lastMove;
+
+        if (prev && view.pgvTurnNumber > prev.pgvTurnNumber) {
+          const entry = computeMoveLogEntry(prev, view);
+          if (entry) {
+            newMoveLog = [...newMoveLog, entry];
+            newLastMove = { playerId: entry.playerId, description: entry.description };
+          }
+        }
+
         set({
           gameView: view,
+          previousGameView: (prev && view.pgvTurnNumber === prev.pgvTurnNumber)
+            ? prev   // keep start-of-turn snapshot
+            : view,  // new turn started (or first snapshot)
+          moveLog: newMoveLog,
+          lastMove: newLastMove,
           selfPlayerId: selfId,
-          // Clear action-specific state on new game state
           legalActions: [],
           gemReturnInfo: null,
           nobleChoices: null,
@@ -91,6 +116,9 @@ export const useGameStore = create<GameState>()((set, get) => ({
   reset: () =>
     set({
       gameView: null,
+      previousGameView: null,
+      moveLog: [],
+      lastMove: null,
       legalActions: [],
       gemReturnInfo: null,
       nobleChoices: null,
