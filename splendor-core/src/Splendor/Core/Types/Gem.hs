@@ -27,7 +27,28 @@ import GHC.Generics (Generic)
 
 data GemColor = Diamond | Sapphire | Emerald | Ruby | Onyx
   deriving stock (Eq, Ord, Show, Read, Enum, Bounded, Generic)
-  deriving anyclass (ToJSON, FromJSON, ToJSONKey, FromJSONKey)
+  deriving anyclass (ToJSON, FromJSON)
+
+-- Custom ToJSONKey/FromJSONKey so Map GemColor keys render as "Diamond" etc.
+-- (The generic derived instance serializes as array-of-pairs instead of object.)
+gemColorToText :: GemColor -> Text
+gemColorToText = T.pack . show
+
+gemColorFromText :: Text -> Maybe GemColor
+gemColorFromText t = case reads (T.unpack t) of
+  [(c, "")] -> Just c
+  _         -> Nothing
+
+instance ToJSONKey GemColor where
+  toJSONKey = Aeson.ToJSONKeyText
+    (Key.fromText . gemColorToText)
+    (E.text . gemColorToText)
+
+instance FromJSONKey GemColor where
+  fromJSONKey = Aeson.FromJSONKeyTextParser $ \t ->
+    case gemColorFromText t of
+      Just c  -> pure c
+      Nothing -> fail $ "Invalid GemColor key: " <> T.unpack t
 
 allGemColors :: [GemColor]
 allGemColors = [minBound .. maxBound]
