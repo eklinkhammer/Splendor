@@ -1,5 +1,49 @@
-import type { Action, CardId, ClientMessage, PublicGameView } from '../../types';
+import type { Action, Card, CardId, ClientMessage, GemCollection, PublicGameView } from '../../types';
+import { ALL_GEM_COLORS, countBonuses, toDisplayEntries } from '../../types';
 import { CardDisplay } from '../game-board/CardDisplay';
+import { GemToken } from '../game-board/GemToken';
+
+function PaymentBreakdown({
+  payment,
+  card,
+  gameView,
+  selfPlayerId,
+}: {
+  payment: GemCollection;
+  card: Card;
+  gameView: PublicGameView;
+  selfPlayerId: string | null;
+}) {
+  const paymentEntries = toDisplayEntries(payment);
+  if (paymentEntries.length === 0) return null;
+
+  const self = gameView.pgvPlayers.find((p) => p.ppPlayerId === selfPlayerId);
+  const bonuses = self ? countBonuses(self.ppPurchased) : {};
+  const discountTotal = ALL_GEM_COLORS.reduce((sum, c) => {
+    const cost = card.cardCost[c] ?? 0;
+    const bonus = bonuses[c] ?? 0;
+    return sum + Math.min(cost, bonus);
+  }, 0);
+  const hasDiscount = discountTotal > 0;
+
+  return (
+    <div className="mt-2 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-semibold text-gray-400 uppercase w-14">Paying</span>
+        <div className="flex gap-1">
+          {paymentEntries.map(([token, count]) => (
+            <GemToken key={token} token={token} count={count} size="sm" />
+          ))}
+        </div>
+      </div>
+      {hasDiscount && (
+        <div className="text-[10px] text-emerald-400">
+          {discountTotal} gem{discountTotal > 1 ? 's' : ''} discounted by bonuses
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   legalActions: Action[];
@@ -63,6 +107,12 @@ export function BuyCardPanel({ legalActions, gameView, selfPlayerId, selectedCar
           <CardDisplay card={selectedCard} />
           <div className="flex-1">
             <p className="text-sm font-medium text-gray-100">Buy this card?</p>
+            <PaymentBreakdown
+              payment={selectedAction.contents[1]}
+              card={selectedCard}
+              gameView={gameView}
+              selfPlayerId={selfPlayerId}
+            />
             <div className="flex gap-2 mt-2">
               <button
                 onClick={handleBuy}
