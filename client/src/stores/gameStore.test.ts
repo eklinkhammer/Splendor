@@ -300,4 +300,114 @@ describe('gameStore', () => {
       expect(stateAfter.selfPlayerId).toBe(stateBefore.selfPlayerId);
     });
   });
+
+  describe('move log', () => {
+    it('moveLog starts empty', () => {
+      expect(useGameStore.getState().moveLog).toEqual([]);
+    });
+
+    it('lastMove starts null', () => {
+      expect(useGameStore.getState().lastMove).toBeNull();
+    });
+
+    it('appends to moveLog on turn advance', () => {
+      const { handleServerMessage } = useGameStore.getState();
+
+      // Turn 1: player takes gems
+      const view1 = makeGameView({
+        pgvPlayers: [
+          makePlayer({ ppPlayerId: 'p1', ppPlayerName: 'Alice', ppTokens: {}, ppReserved: [] }),
+        ],
+        pgvCurrentPlayer: 0,
+        pgvTurnNumber: 1,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
+      expect(useGameStore.getState().moveLog).toEqual([]);
+
+      // Turn 2: player gained gems since turn 1
+      const view2 = makeGameView({
+        pgvPlayers: [
+          makePlayer({ ppPlayerId: 'p1', ppPlayerName: 'Alice', ppTokens: { Diamond: 1, Ruby: 1, Sapphire: 1 }, ppReserved: [] }),
+        ],
+        pgvCurrentPlayer: 0,
+        pgvTurnNumber: 2,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
+
+      const log = useGameStore.getState().moveLog;
+      expect(log).toHaveLength(1);
+      expect(log[0].description).toBe('Took gems: Diamond, Sapphire, Ruby');
+    });
+
+    it('does not add entry for same-turn GSU', () => {
+      const { handleServerMessage } = useGameStore.getState();
+
+      const view1 = makeGameView({
+        pgvPlayers: [makePlayer({ ppReserved: [] })],
+        pgvTurnNumber: 1,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
+
+      // Second GSU at same turn (e.g. gem return phase)
+      const view2 = makeGameView({
+        pgvPlayers: [makePlayer({ ppTokens: { Diamond: 1 }, ppReserved: [] })],
+        pgvTurnNumber: 1,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
+
+      expect(useGameStore.getState().moveLog).toEqual([]);
+    });
+
+    it('updates lastMove on turn advance', () => {
+      const { handleServerMessage } = useGameStore.getState();
+
+      const view1 = makeGameView({
+        pgvPlayers: [
+          makePlayer({ ppPlayerId: 'p1', ppPlayerName: 'Alice', ppReservedCount: 0, ppReserved: [] }),
+        ],
+        pgvCurrentPlayer: 0,
+        pgvTurnNumber: 1,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
+
+      const view2 = makeGameView({
+        pgvPlayers: [
+          makePlayer({ ppPlayerId: 'p1', ppPlayerName: 'Alice', ppReservedCount: 1, ppTokens: { Gold: 1 }, ppReserved: [] }),
+        ],
+        pgvCurrentPlayer: 0,
+        pgvTurnNumber: 2,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
+
+      const lastMove = useGameStore.getState().lastMove;
+      expect(lastMove).not.toBeNull();
+      expect(lastMove!.playerId).toBe('p1');
+      expect(lastMove!.description).toBe('Reserved a card (+1 Gold)');
+    });
+
+    it('reset clears moveLog and lastMove', () => {
+      const { handleServerMessage } = useGameStore.getState();
+
+      // Build up some log state
+      const view1 = makeGameView({
+        pgvPlayers: [makePlayer({ ppTokens: {}, ppReserved: [] })],
+        pgvTurnNumber: 1,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
+
+      const view2 = makeGameView({
+        pgvPlayers: [makePlayer({ ppTokens: { Ruby: 2 }, ppReserved: [] })],
+        pgvTurnNumber: 2,
+      });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
+
+      expect(useGameStore.getState().moveLog.length).toBeGreaterThan(0);
+      expect(useGameStore.getState().lastMove).not.toBeNull();
+
+      useGameStore.getState().reset();
+
+      expect(useGameStore.getState().moveLog).toEqual([]);
+      expect(useGameStore.getState().lastMove).toBeNull();
+    });
+  });
 });
