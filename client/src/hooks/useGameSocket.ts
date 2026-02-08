@@ -1,9 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { connectGame, type GameSocket } from '../services/websocket';
+import { connectGame, connectSpectator, type GameSocket } from '../services/websocket';
 import { useGameStore } from '../stores/gameStore';
 import type { ClientMessage } from '../types';
 
-export function useGameSocket(gameId: string | null, sessionId: string | null) {
+export function useGameSocket(
+  gameId: string | null,
+  sessionId: string | null,
+  spectator?: boolean,
+) {
   const socketRef = useRef<GameSocket | null>(null);
   const retriesRef = useRef(0);
   const mountedRef = useRef(true);
@@ -12,35 +16,35 @@ export function useGameSocket(gameId: string | null, sessionId: string | null) {
   const setConnected = useGameStore((s) => s.setConnected);
 
   const connect = useCallback(() => {
-    if (!gameId || !sessionId || !mountedRef.current) return;
+    if (!gameId || !mountedRef.current) return;
+    if (!spectator && !sessionId) return;
 
-    socketRef.current = connectGame(
-      gameId,
-      sessionId,
-      (msg) => {
-        handleMessage(msg);
-        // Reset retry counter on successful message
-        retriesRef.current = 0;
-      },
-      () => {
-        // onClose — reconnect with exponential backoff
-        setConnected(false);
-        if (!mountedRef.current) return;
-        const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
-        retriesRef.current += 1;
-        setTimeout(() => {
-          if (mountedRef.current) connect();
-        }, delay);
-      },
-      () => {
-        setConnected(false);
-      },
-      () => {
-        // onOpen — only mark connected after WebSocket handshake completes
-        if (mountedRef.current) setConnected(true);
-      },
-    );
-  }, [gameId, sessionId, handleMessage, setConnected]);
+    const onMessage = (msg: Parameters<typeof handleMessage>[0]) => {
+      handleMessage(msg);
+      retriesRef.current = 0;
+    };
+    const onClose = () => {
+      setConnected(false);
+      if (!mountedRef.current) return;
+      const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
+      retriesRef.current += 1;
+      setTimeout(() => {
+        if (mountedRef.current) connect();
+      }, delay);
+    };
+    const onError = () => {
+      setConnected(false);
+    };
+    const onOpen = () => {
+      if (mountedRef.current) setConnected(true);
+    };
+
+    if (spectator) {
+      socketRef.current = connectSpectator(gameId, onMessage, onClose, onError, onOpen);
+    } else {
+      socketRef.current = connectGame(gameId, sessionId!, onMessage, onClose, onError, onOpen);
+    }
+  }, [gameId, sessionId, spectator, handleMessage, setConnected]);
 
   useEffect(() => {
     mountedRef.current = true;

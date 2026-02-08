@@ -36,7 +36,7 @@ export function GameBoard({
   bankTakeAction,
 }: Props) {
   return (
-    <div className="bg-[var(--board-felt)] rounded-xl p-6 shadow-inner space-y-4">
+    <div className="bg-[var(--board-felt)] rounded-xl p-2 sm:p-4 lg:p-6 shadow-inner space-y-2 sm:space-y-3 lg:space-y-4">
       {/* Nobles section */}
       <NobleRow nobles={board.publicNobles} />
 

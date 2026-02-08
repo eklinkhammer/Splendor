@@ -11,6 +11,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/game/:id" element={<GamePage />} />
+        <Route path="/game/:id/spectate" element={<GamePage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>,

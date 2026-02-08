@@ -24,6 +24,7 @@ type LobbyAPI =
   :<|> "lobbies" :> Capture "id" LobbyId :> "join" :> ReqBody '[JSON] JoinLobbyRequest :> Post '[JSON] JoinLobbyResponse
   :<|> "lobbies" :> Capture "id" LobbyId :> "start" :> Post '[JSON] StartGameResponse
   :<|> "lobbies" :> Capture "id" LobbyId :> "add-ai" :> Post '[JSON] LobbySlot
+  :<|> "lobbies" :> Capture "id" LobbyId :> "leave" :> QueryParam' '[Required] "session" SessionId :> Post '[JSON] NoContent
 
 lobbyServer :: ServerState -> Server LobbyAPI
 lobbyServer ss =
@@ -33,6 +34,7 @@ lobbyServer ss =
   :<|> joinLobbyHandler ss
   :<|> startGameHandler ss
   :<|> addAIHandler ss
+  :<|> leaveLobbyHandler ss
 
 createLobbyHandler :: ServerState -> CreateLobbyRequest -> Handler CreateLobbyResponse
 createLobbyHandler ss req = do
@@ -166,6 +168,35 @@ addAIHandler ss lid = do
   case result of
     Left err -> throwError err400 { errBody = encodeUtf8 err }
     Right slot -> pure slot
+
+leaveLobbyHandler :: ServerState -> LobbyId -> SessionId -> Handler NoContent
+leaveLobbyHandler ss lid sid = do
+  result <- liftIO $ atomically $ do
+    lobbies <- readTVar (ssLobbies ss)
+    case Map.lookup lid lobbies of
+      Nothing -> pure (Left "Lobby not found")
+      Just lobby ->
+        case lobbyStatus lobby of
+          Waiting -> do
+            let isCreator = case lobbySlots lobby of
+                              (s:_) -> lsSessionId s == sid
+                              []    -> False
+                slots' = filter (\s -> lsSessionId s /= sid) (lobbySlots lobby)
+            if length slots' == length (lobbySlots lobby)
+              then pure (Left "Session not in lobby")
+              else if isCreator
+                then do
+                  modifyTVar' (ssLobbies ss) $
+                    Map.adjust (\l -> l { lobbyStatus = Closed }) lid
+                  pure (Right ())
+                else do
+                  modifyTVar' (ssLobbies ss) $
+                    Map.adjust (\l -> l { lobbySlots = slots' }) lid
+                  pure (Right ())
+          _ -> pure (Left "Cannot leave: game already started")
+  case result of
+    Left err -> throwError err400 { errBody = encodeUtf8 err }
+    Right () -> pure NoContent
 
 encodeUtf8 :: Text -> LBS.ByteString
 encodeUtf8 = LBS.fromStrict . TE.encodeUtf8

@@ -56,3 +56,26 @@ export function startGame(lobbyId: string): Promise<StartGameResponse> {
 export function getGame(gameId: string, sessionId: string): Promise<PublicGameView> {
   return request(`${BASE}/games/${gameId}?session=${encodeURIComponent(sessionId)}`);
 }
+
+export function leaveLobby(lobbyId: string, sessionId: string): Promise<void> {
+  return request(`${BASE}/lobbies/${lobbyId}/leave?session=${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+  });
+}
+
+export async function playAgain(
+  playerName: string,
+  lobbyName: string,
+  aiCount: number,
+): Promise<{ lobbyId: string; sessionId: string; gameId: string }> {
+  const lobby = await createLobby(playerName, lobbyName);
+  for (let i = 0; i < aiCount; i++) {
+    await addAI(lobby.clrLobbyId);
+  }
+  const game = await startGame(lobby.clrLobbyId);
+  return {
+    lobbyId: lobby.clrLobbyId,
+    sessionId: lobby.clrSessionId,
+    gameId: game.sgrGameId,
+  };
+}

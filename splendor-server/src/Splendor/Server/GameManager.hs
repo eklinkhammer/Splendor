@@ -5,6 +5,8 @@ module Splendor.Server.GameManager
   , processNobleChoice
   , registerConnection
   , unregisterConnection
+  , registerSpectator
+  , unregisterSpectator
   , lookupGame
   , lookupSession
   , resolveSession
@@ -44,6 +46,7 @@ createGame ss slots = do
         { mgGameState     = gs
         , mgSessions      = sessions
         , mgConnections   = chanMap
+        , mgSpectators    = Map.empty
         , mgStatus        = GameActive
         , mgPendingNobles = Nothing
         , mgAIThreads     = []
@@ -203,6 +206,18 @@ unregisterConnection gameTVar sid =
   modifyTVar' gameTVar $ \mg ->
     mg { mgConnections = Map.delete sid (mgConnections mg) }
 
+registerSpectator :: TVar ManagedGame -> SpectatorId -> STM (TChan ServerMessage)
+registerSpectator gameTVar specId = do
+  chan <- newTChan
+  modifyTVar' gameTVar $ \mg ->
+    mg { mgSpectators = Map.insert specId chan (mgSpectators mg) }
+  pure chan
+
+unregisterSpectator :: TVar ManagedGame -> SpectatorId -> STM ()
+unregisterSpectator gameTVar specId =
+  modifyTVar' gameTVar $ \mg ->
+    mg { mgSpectators = Map.delete specId (mgSpectators mg) }
+
 -- -----------------------------------------------------------------
 -- Lookup helpers
 -- -----------------------------------------------------------------
@@ -245,6 +260,10 @@ broadcastGameState mg = do
                 in writeTChan chan (ActionRequired actions)
           _ -> pure ()
     ) (Map.toList (mgConnections mg))
+  -- Send spectator view (no reserved cards visible)
+  let spectatorView = toSpectatorGameView gs
+  mapM_ (\chan -> writeTChan chan (GameStateUpdate spectatorView))
+    (Map.elems (mgSpectators mg))
 
 -- | Send gem return prompt to the current player.
 sendGemReturnPrompt :: ManagedGame -> Int -> STM ()
@@ -275,10 +294,11 @@ sendNobleChoicePrompt mg nobles = do
           _ -> pure ()
         ) (Map.toList (mgConnections mg))
 
--- | Broadcast a message to all connected players.
+-- | Broadcast a message to all connected players and spectators.
 broadcastMessage :: ManagedGame -> ServerMessage -> STM ()
-broadcastMessage mg msg =
+broadcastMessage mg msg = do
   mapM_ (\chan -> writeTChan chan msg) (Map.elems (mgConnections mg))
+  mapM_ (\chan -> writeTChan chan msg) (Map.elems (mgSpectators mg))
 
 -- | Remove a game's sessions from the global session map.
 --   Returns AI thread IDs that should be killed in IO after the transaction.

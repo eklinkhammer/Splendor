@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useSessionStore } from '../stores/sessionStore';
 import { useGameStore } from '../stores/gameStore';
@@ -17,10 +17,13 @@ import { GemToken } from '../components/game-board/GemToken';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { GameOverOverlay } from '../components/game-board/GameOverOverlay';
 import { MoveLog } from '../components/game-board/MoveLog';
+import { ChatPanel } from '../components/game-board/ChatPanel';
 
 export function GamePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isSpectator = location.pathname.endsWith('/spectate');
   const sessionId = useSessionStore((s) => s.sessionId);
   const gameView = useGameStore((s) => s.gameView);
   const gameResult = useGameStore((s) => s.gameResult);
@@ -29,19 +32,17 @@ export function GamePage() {
   const nobleChoices = useGameStore((s) => s.nobleChoices);
   const connected = useGameStore((s) => s.connected);
   const reset = useGameStore((s) => s.reset);
-  const setGameId = useSessionStore((s) => s.setGameId);
-  const setLobbyId = useSessionStore((s) => s.setLobbyId);
 
-  // Redirect if no session
+  // Redirect if no session (skip for spectators)
   useEffect(() => {
-    if (!sessionId) {
+    if (!isSpectator && !sessionId) {
       navigate('/');
     }
-  }, [sessionId, navigate]);
+  }, [isSpectator, sessionId, navigate]);
 
-  // REST fallback: load game state if WebSocket hasn't delivered yet
+  // REST fallback: load game state if WebSocket hasn't delivered yet (players only)
   useEffect(() => {
-    if (id && sessionId && !gameView) {
+    if (id && sessionId && !gameView && !isSpectator) {
       getGame(id, sessionId).then((view) => {
         useGameStore.getState().handleServerMessage({
           tag: 'GameStateUpdate',
@@ -51,9 +52,9 @@ export function GamePage() {
         // WebSocket will deliver state
       });
     }
-  }, [id, sessionId, gameView]);
+  }, [id, sessionId, gameView, isSpectator]);
 
-  const { send } = useGameSocket(id ?? null, sessionId);
+  const { send } = useGameSocket(id ?? null, isSpectator ? null : sessionId, isSpectator);
 
   const {
     selectedCardId,
@@ -86,7 +87,7 @@ export function GamePage() {
 
   // Build the Take button for the gem bank
   const bankTakeAction = useMemo(() => {
-    if (selectedBankGems.length === 0) return undefined;
+    if (isSpectator || selectedBankGems.length === 0) return undefined;
     return (
       <div className="flex justify-center mt-2">
         <button
@@ -98,10 +99,11 @@ export function GamePage() {
         </button>
       </div>
     );
-  }, [selectedBankGems.length, matchedTakeAction, handleTakeGems]);
+  }, [isSpectator, selectedBankGems.length, matchedTakeAction, handleTakeGems]);
 
   // Build the card action overlay for the currently selected card
   const selectedCardOverlay = useMemo(() => {
+    if (isSpectator) return null;
     if (!selectedCardId || (!selectedBuyAction && !selectedReserveAction)) return null;
 
     // Build payment breakdown for buy actions
@@ -132,41 +134,101 @@ export function GamePage() {
         paymentBreakdown={paymentBreakdown}
       />
     );
-  }, [selectedCardId, selectedBuyAction, selectedReserveAction, handleBuy, handleReserve, clearSelection, gameView]);
+  }, [isSpectator, selectedCardId, selectedBuyAction, selectedReserveAction, handleBuy, handleReserve, clearSelection, gameView]);
 
   // Build the deck action overlay for the currently selected deck
   const selectedDeckOverlay = useMemo(() => {
-    if (!selectedDeckTier) return null;
+    if (isSpectator || !selectedDeckTier) return null;
     return (
       <CardActionOverlay
         onReserve={handleDeckReserve}
         onCancel={clearSelection}
       />
     );
-  }, [selectedDeckTier, handleDeckReserve, clearSelection]);
+  }, [isSpectator, selectedDeckTier, handleDeckReserve, clearSelection]);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — only reset game state, don't wipe session IDs
+  // (session IDs are cleared explicitly via clearSession in "Return to Lobby")
   useEffect(() => {
     return () => {
       reset();
-      setGameId(null);
-      setLobbyId(null);
     };
-  }, [reset, setGameId, setLobbyId]);
+  }, [reset]);
 
-  if (!id || !sessionId) return null;
+  const [mobileTab, setMobileTab] = useState<'players' | 'log' | 'chat'>('players');
+  const [sidebarTab, setSidebarTab] = useState<'moves' | 'chat'>('moves');
+  const chatMessages = useGameStore((s) => s.chatMessages);
+  const [chatSeen, setChatSeen] = useState(0);
+  const chatUnread = chatMessages.length > chatSeen;
+
+  if (!id || (!isSpectator && !sessionId)) return null;
 
   if (!gameView) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <p className="text-gray-400">Connecting to game...</p>
+        <p className="text-gray-400">{isSpectator ? 'Connecting as spectator...' : 'Connecting to game...'}</p>
       </div>
     );
   }
 
+  const movesOrChat = (
+    <>
+      <div className="flex border-b border-gray-700 mb-2">
+        <button
+          type="button"
+          onClick={() => { setSidebarTab('moves'); }}
+          className={`flex-1 py-1.5 text-xs font-semibold text-center transition-colors ${
+            sidebarTab === 'moves'
+              ? 'text-white border-b-2 border-blue-500'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Moves
+        </button>
+        <button
+          type="button"
+          onClick={() => { setSidebarTab('chat'); setChatSeen(chatMessages.length); }}
+          className={`flex-1 py-1.5 text-xs font-semibold text-center transition-colors relative ${
+            sidebarTab === 'chat'
+              ? 'text-white border-b-2 border-blue-500'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Chat
+          {chatUnread && sidebarTab !== 'chat' && (
+            <span className="absolute top-1 ml-0.5 w-2 h-2 bg-blue-500 rounded-full" />
+          )}
+        </button>
+      </div>
+      {sidebarTab === 'moves' ? <MoveLog /> : <ChatPanel send={send} readOnly={isSpectator} />}
+    </>
+  );
+
+  const sidebarContent = (
+    <>
+      <PlayerArea
+        players={gameView.pgvPlayers}
+        selfPlayerId={isSpectator ? null : selfPlayerId}
+        currentPlayerIndex={gameView.pgvCurrentPlayer}
+        onReservedCardClick={isSpectator ? undefined : onCardClick}
+        selectedCardId={isSpectator ? null : selectedCardId}
+        selectedCardOverlay={isSpectator ? null : selectedCardOverlay}
+      />
+      <div className="mt-3">
+        {movesOrChat}
+      </div>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-900 p-4">
+    <div className="min-h-screen bg-gray-900 p-2 sm:p-4">
       <div className="max-w-6xl mx-auto">
+        {isSpectator && (
+          <div className="mb-2 px-4 py-2 bg-gradient-to-r from-indigo-500/90 to-purple-500/90 text-white text-sm font-medium rounded-xl shadow-md flex items-center justify-center gap-2">
+            Spectating
+          </div>
+        )}
+
         {!connected && (
           <div className="mb-2 px-4 py-2 bg-gradient-to-r from-amber-500/90 to-yellow-500/90 text-white text-sm font-medium rounded-xl shadow-md flex items-center justify-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -179,32 +241,32 @@ export function GamePage() {
 
         <ErrorBanner />
 
-        <div className="mb-3">
-          <GameStatus gameView={gameView} selfPlayerId={selfPlayerId} />
+        <div className="mb-2 sm:mb-3">
+          <GameStatus gameView={gameView} selfPlayerId={isSpectator ? null : selfPlayerId} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
           <div>
             <GameBoard
               board={gameView.pgvBoard}
-              onCardClick={onCardClick}
-              onDeckClick={onDeckClick}
-              highlightCards={highlightCards}
-              selectedCardId={selectedCardId}
-              selectedCardOverlay={selectedCardOverlay}
-              selectedDeckTier={selectedDeckTier}
-              selectedDeckOverlay={selectedDeckOverlay}
-              reservableDeckTiers={reservableDeckTiers}
-              onBankGemClick={onBankGemClick}
-              selectedGemCounts={selectedGemCounts}
-              availableGemColors={availableGemColors}
-              bankTakeAction={bankTakeAction}
+              onCardClick={isSpectator ? undefined : onCardClick}
+              onDeckClick={isSpectator ? undefined : onDeckClick}
+              highlightCards={isSpectator ? undefined : highlightCards}
+              selectedCardId={isSpectator ? null : selectedCardId}
+              selectedCardOverlay={isSpectator ? null : selectedCardOverlay}
+              selectedDeckTier={isSpectator ? null : selectedDeckTier}
+              selectedDeckOverlay={isSpectator ? null : selectedDeckOverlay}
+              reservableDeckTiers={isSpectator ? undefined : reservableDeckTiers}
+              onBankGemClick={isSpectator ? undefined : onBankGemClick}
+              selectedGemCounts={isSpectator ? undefined : selectedGemCounts}
+              availableGemColors={isSpectator ? undefined : availableGemColors}
+              bankTakeAction={isSpectator ? undefined : bankTakeAction}
             />
-            {nobleChoices && nobleChoices.length > 0 ? (
+            {!isSpectator && nobleChoices && nobleChoices.length > 0 ? (
               <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
                 <NobleChoicePanel nobles={nobleChoices} send={send} />
               </div>
-            ) : gemReturnInfo ? (
+            ) : !isSpectator && gemReturnInfo ? (
               <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
                 <GemReturnPanel
                   amount={gemReturnInfo.amount}
@@ -216,23 +278,70 @@ export function GamePage() {
             ) : null}
           </div>
 
-          <div>
+          {/* Desktop sidebar */}
+          <div className="hidden lg:block">
+            {sidebarContent}
+          </div>
+        </div>
+
+        {/* Mobile tabbed sidebar */}
+        <div className="lg:hidden mt-4">
+          <div className="flex border-b border-gray-700 mb-3">
+            <button
+              type="button"
+              onClick={() => setMobileTab('players')}
+              className={`flex-1 py-2 text-sm font-semibold text-center transition-colors ${
+                mobileTab === 'players'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Players
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab('log')}
+              className={`flex-1 py-2 text-sm font-semibold text-center transition-colors ${
+                mobileTab === 'log'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Moves
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMobileTab('chat'); setChatSeen(chatMessages.length); }}
+              className={`flex-1 py-2 text-sm font-semibold text-center transition-colors relative ${
+                mobileTab === 'chat'
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              Chat
+              {chatUnread && mobileTab !== 'chat' && (
+                <span className="absolute top-1 ml-0.5 w-2 h-2 bg-blue-500 rounded-full" />
+              )}
+            </button>
+          </div>
+          {mobileTab === 'players' ? (
             <PlayerArea
               players={gameView.pgvPlayers}
-              selfPlayerId={selfPlayerId}
+              selfPlayerId={isSpectator ? null : selfPlayerId}
               currentPlayerIndex={gameView.pgvCurrentPlayer}
-              onReservedCardClick={onCardClick}
-              selectedCardId={selectedCardId}
-              selectedCardOverlay={selectedCardOverlay}
+              onReservedCardClick={isSpectator ? undefined : onCardClick}
+              selectedCardId={isSpectator ? null : selectedCardId}
+              selectedCardOverlay={isSpectator ? null : selectedCardOverlay}
             />
-            <div className="mt-3">
-              <MoveLog />
-            </div>
-          </div>
+          ) : mobileTab === 'log' ? (
+            <MoveLog />
+          ) : (
+            <ChatPanel send={send} readOnly={isSpectator} />
+          )}
         </div>
       </div>
 
-      {gameResult && <GameOverOverlay result={gameResult} />}
+      {gameResult && !isSpectator && <GameOverOverlay result={gameResult} />}
     </div>
   );
 }

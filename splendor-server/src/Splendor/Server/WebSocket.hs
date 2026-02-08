@@ -1,12 +1,15 @@
 module Splendor.Server.WebSocket
   ( handleWebSocket
+  , handleSpectatorWebSocket
   ) where
 
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM
 import Control.Exception (finally)
 import Data.Aeson (decode, encode)
+import Data.Map.Strict qualified as Map
 import Data.Text (Text)
+import Data.Text qualified as T
 import Network.WebSockets qualified as WS
 
 import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
@@ -14,7 +17,8 @@ import Splendor.Core.Types (currentPlayer, playerId, gsTurnPhase, TurnPhase(..))
 
 import Splendor.Server.GameManager (lookupGame, processAction, processGemReturn,
                                      processNobleChoice, registerConnection,
-                                     unregisterConnection, resolveSession)
+                                     unregisterConnection, registerSpectator,
+                                     unregisterSpectator, resolveSession)
 import Splendor.Server.Types
 
 -- | Handle a WebSocket connection for a game.
@@ -103,3 +107,41 @@ handleClientMessage ss conn gameId sessionId = \case
     case result of
       Left err -> WS.sendTextData conn (encode (ErrorMsg err))
       Right () -> pure ()
+  SendChat text -> do
+    mGameTVar <- lookupGame ss gameId
+    case mGameTVar of
+      Nothing -> pure ()
+      Just gameTVar -> do
+        let truncated = T.take 200 text
+        atomically $ do
+          mg <- readTVar gameTVar
+          case resolveSession sessionId mg of
+            Nothing -> pure ()
+            Just ps -> do
+              let chatMsg = ChatMessage (psPlayerName ps) truncated
+              mapM_ (\chan -> writeTChan chan chatMsg) (Map.elems (mgConnections mg))
+              mapM_ (\chan -> writeTChan chan chatMsg) (Map.elems (mgSpectators mg))
+
+-- | Handle a spectator WebSocket connection (read-only).
+handleSpectatorWebSocket :: TVar ManagedGame -> SpectatorId -> WS.Connection -> IO ()
+handleSpectatorWebSocket gameTVar specId conn = do
+  chan <- atomically $ registerSpectator gameTVar specId
+  -- Send initial spectator view
+  mg <- atomically $ readTVar gameTVar
+  let view = toSpectatorGameView (mgGameState mg)
+  WS.sendTextData conn (encode (GameStateUpdate view))
+  -- Fork sender
+  senderId <- forkIO $ senderLoop conn chan
+  -- Receiver: only accept Ping, reject everything else
+  finally
+    (spectatorReceiverLoop conn)
+    (do killThread senderId
+        atomically $ unregisterSpectator gameTVar specId)
+
+spectatorReceiverLoop :: WS.Connection -> IO ()
+spectatorReceiverLoop conn = do
+  raw <- WS.receiveData conn
+  case decode raw of
+    Just Ping -> WS.sendTextData conn (encode Pong)
+    _ -> WS.sendTextData conn (encode (ErrorMsg "Spectators cannot perform actions" :: ServerMessage))
+  spectatorReceiverLoop conn

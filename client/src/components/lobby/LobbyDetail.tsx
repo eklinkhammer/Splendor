@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getLobby, startGame, addAI } from '../../services/api';
+import { getLobby, startGame, addAI, leaveLobby } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import type { Lobby } from '../../types';
 
@@ -13,8 +13,10 @@ export function LobbyDetail({ lobbyId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [addingAI, setAddingAI] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const navigate = useNavigate();
   const sessionId = useSessionStore((s) => s.sessionId);
+  const clearSession = useSessionStore((s) => s.clear);
   const setGameId = useSessionStore((s) => s.setGameId);
 
   useEffect(() => {
@@ -72,6 +74,21 @@ export function LobbyDetail({ lobbyId }: Props) {
     }
   };
 
+  const handleLeave = async () => {
+    if (!sessionId) return;
+    setLeaving(true);
+    setError(null);
+    try {
+      await leaveLobby(lobbyId, sessionId);
+      clearSession();
+      navigate('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to leave lobby');
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   if (!lobby) {
     return <p className="text-gray-400">Loading lobby...</p>;
   }
@@ -105,6 +122,14 @@ export function LobbyDetail({ lobbyId }: Props) {
         </ul>
       </div>
       {error && <p className="text-red-500 text-sm">{error}</p>}
+      {lobby.lobbyStatus.tag === 'Started' && (
+        <a
+          href={`/game/${lobby.lobbyStatus.contents}/spectate`}
+          className="block w-full px-4 py-2 bg-indigo-600 text-white text-center rounded hover:bg-indigo-700"
+        >
+          Spectate Game
+        </a>
+      )}
       {lobby.lobbyStatus.tag === 'Waiting' && (
         <div className="space-y-2">
           {canAddAI && (
@@ -131,6 +156,13 @@ export function LobbyDetail({ lobbyId }: Props) {
           ) : (
             <p className="text-gray-400 text-sm text-center">Waiting for host to start...</p>
           )}
+          <button
+            onClick={handleLeave}
+            disabled={leaving}
+            className="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50"
+          >
+            {leaving ? 'Leaving...' : 'Leave Lobby'}
+          </button>
         </div>
       )}
     </div>

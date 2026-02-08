@@ -21,7 +21,7 @@ export function NobleRow({ nobles, onNobleClick, highlightNobles = [] }: Props) 
       <div className="text-xs font-semibold text-amber-200/80 uppercase tracking-wider mb-1.5 text-center">
         Nobles
       </div>
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-1.5 sm:gap-2 lg:gap-3 justify-center">
         {nobles.map((noble) => {
           const reqs = ALL_GEM_COLORS.filter((c) => (noble.nobleRequirement[c] ?? 0) > 0);
           const isHighlighted = highlightNobles.includes(noble.nobleId);
@@ -31,21 +31,21 @@ export function NobleRow({ nobles, onNobleClick, highlightNobles = [] }: Props) 
               type="button"
               onClick={onNobleClick ? () => onNobleClick(noble.nobleId) : undefined}
               disabled={!onNobleClick}
-              className={`w-24 h-28 rounded-lg p-2 flex flex-col justify-between
+              className={`w-[var(--noble-width)] h-[var(--noble-height)] rounded-lg p-1.5 sm:p-2 flex flex-col justify-between
                 bg-gradient-to-b from-amber-700 to-amber-800
                 border-2 transition-all duration-200 shadow-md
                 ${isHighlighted ? 'border-amber-400 shadow-lg shadow-amber-400/30' : 'border-amber-600/70'}
                 ${onNobleClick ? 'cursor-pointer hover:border-amber-400 hover:-translate-y-0.5 hover:shadow-lg' : 'cursor-default'}`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-lg font-extrabold text-purple-200">{noble.noblePrestige}</span>
-                <span className="text-sm">👑</span>
+                <span className="text-sm sm:text-base lg:text-lg font-extrabold text-purple-200">{noble.noblePrestige}</span>
+                <span className="text-xs sm:text-sm">👑</span>
               </div>
-              <div className="flex gap-1 justify-center">
+              <div className="flex gap-0.5 sm:gap-1 justify-center">
                 {reqs.map((color) => (
                   <div
                     key={color}
-                    className={`w-6 h-6 rounded-full text-xs flex items-center justify-center font-bold shadow-sm ${REQ_COLORS[color]}`}
+                    className={`w-4.5 h-4.5 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full text-[10px] sm:text-xs flex items-center justify-center font-bold shadow-sm ${REQ_COLORS[color]}`}
                   >
                     {noble.nobleRequirement[color]}
                   </div>

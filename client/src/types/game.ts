@@ -170,6 +170,7 @@ export type ClientMessage =
   | { tag: 'SubmitAction'; contents: Action }
   | { tag: 'ReturnGems'; contents: GemCollection }
   | { tag: 'ChooseNoble'; contents: NobleId }
+  | { tag: 'SendChat'; contents: string }
   | { tag: 'Ping' };
 
 export type ServerMessage =
@@ -178,5 +179,6 @@ export type ServerMessage =
   | { tag: 'GemReturnNeeded'; contents: [number, GemCollection[]] }
   | { tag: 'NobleChoiceRequired'; contents: Noble[] }
   | { tag: 'GameOverMsg'; contents: GameResult }
+  | { tag: 'ChatMessage'; contents: [string, string] }
   | { tag: 'ErrorMsg'; contents: string }
   | { tag: 'Pong' };

@@ -18,7 +18,9 @@ interface Props {
 }
 
 export function GemToken({ token, count, onClick, selectedCount, size = 'md' }: Props) {
-  const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-base';
+  const sizeClass = size === 'sm'
+    ? 'w-[var(--gem-size-sm)] h-[var(--gem-size-sm)] text-[10px] sm:text-xs'
+    : 'w-[var(--gem-size-md)] h-[var(--gem-size-md)] text-sm sm:text-base';
   const effectiveCount = selectedCount ?? 0;
   const selectionClass =
     effectiveCount >= 2

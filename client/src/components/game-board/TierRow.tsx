@@ -35,9 +35,9 @@ interface Props {
 
 export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [], selectedCardId, selectedCardOverlay, isDeckSelected, selectedDeckOverlay, isDeckReservable }: Props) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1 sm:gap-1.5 lg:gap-2">
       {/* Tier label */}
-      <div className={`w-8 h-8 rounded-md flex items-center justify-center text-sm font-extrabold ${TIER_BADGE_STYLES[tier]}`}>
+      <div className={`w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-md flex items-center justify-center text-xs sm:text-sm font-extrabold ${TIER_BADGE_STYLES[tier]}`}>
         {TIER_LABELS[tier]}
       </div>
 
@@ -47,12 +47,12 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
           type="button"
           onClick={onDeckClick}
           disabled={!onDeckClick || row.publicDeckCount === 0}
-          className={`w-28 h-[var(--card-height)] rounded-lg border-2 flex flex-col items-center justify-center
+          className={`w-[var(--card-width)] h-[var(--card-height)] rounded-lg border-2 flex flex-col items-center justify-center
             bg-gradient-to-br ${TIER_DECK_STYLES[tier]} shadow-md
             ${isDeckSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 scale-105 border-amber-400 shadow-lg shadow-amber-300/50' : isDeckReservable ? 'border-amber-400 shadow-lg shadow-amber-300/50' : ''}
             ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:shadow-lg hover:brightness-110 transition-all' : 'cursor-default opacity-60'}`}
         >
-          <span className="text-3xl font-bold text-white/90 drop-shadow-sm">{row.publicDeckCount}</span>
+          <span className="text-lg sm:text-2xl lg:text-3xl font-bold text-white/90 drop-shadow-sm">{row.publicDeckCount}</span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${TIER_BADGE_STYLES[tier]}`}>
             {tier.replace('Tier', 'Tier ')}
           </span>
@@ -78,7 +78,7 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
 
       {/* Empty slots */}
       {Array.from({ length: Math.max(0, 4 - row.publicDisplay.length) }).map((_, i) => (
-        <div key={`empty-${i}`} className="w-28 h-[var(--card-height)] rounded-lg border-2 border-dashed border-white/20 bg-white/5" />
+        <div key={`empty-${i}`} className="w-[var(--card-width)] h-[var(--card-height)] rounded-lg border-2 border-dashed border-white/20 bg-white/5" />
       ))}
     </div>
   );

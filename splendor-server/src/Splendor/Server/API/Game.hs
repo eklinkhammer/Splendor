@@ -12,16 +12,18 @@ import Servant.API.WebSocket (WebSocketPending)
 
 import Splendor.Server.GameManager (lookupGame)
 import Splendor.Server.Types
-import Splendor.Server.WebSocket (handleWebSocket)
+import Splendor.Server.WebSocket (handleWebSocket, handleSpectatorWebSocket)
 
 type GameAPI =
        "games" :> Capture "id" GameId :> QueryParam' '[Required] "session" SessionId :> Get '[JSON] PublicGameView
   :<|> "games" :> Capture "id" GameId :> "ws" :> QueryParam' '[Required] "session" SessionId :> WebSocketPending
+  :<|> "games" :> Capture "id" GameId :> "spectate" :> WebSocketPending
 
 gameServer :: ServerState -> Server GameAPI
 gameServer ss =
        getGameHandler ss
   :<|> wsHandler ss
+  :<|> spectateHandler ss
 
 getGameHandler :: ServerState -> GameId -> SessionId -> Handler PublicGameView
 getGameHandler ss gid sid = do
@@ -50,3 +52,14 @@ wsHandler ss gid sid pending = do
           conn <- WS.acceptRequest pending
           WS.withPingThread conn 30 (pure ()) $
             handleWebSocket ss gid sid conn
+
+spectateHandler :: ServerState -> GameId -> WS.PendingConnection -> Handler ()
+spectateHandler ss gid pending = do
+  mGameTVar <- liftIO $ lookupGame ss gid
+  case mGameTVar of
+    Nothing -> liftIO $ WS.rejectRequest pending "Game not found"
+    Just gameTVar -> liftIO $ do
+      specId <- newUUID
+      conn <- WS.acceptRequest pending
+      WS.withPingThread conn 30 (pure ()) $
+        handleSpectatorWebSocket gameTVar specId conn

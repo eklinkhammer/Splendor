@@ -48,21 +48,21 @@ export function CardDisplay({ card, onClick, highlight, selected }: Props) {
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`w-28 h-[var(--card-height)] rounded-lg overflow-hidden flex flex-col
+      className={`w-[var(--card-width)] h-[var(--card-height)] rounded-lg overflow-hidden flex flex-col
         border-2 transition-all duration-200
         ${selected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 scale-105 border-amber-400 shadow-lg shadow-amber-300/50' : highlight ? 'border-amber-400 shadow-lg shadow-amber-300/50' : 'border-gray-600/80'}
         ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:border-amber-300' : 'cursor-default'}
         bg-[var(--card-bg)] shadow-md`}
     >
       {/* Header band with gradient */}
-      <div className={`relative h-[46px] w-full bg-gradient-to-br ${HEADER_GRADIENTS[card.cardBonus]} flex items-start justify-between px-2 pt-1.5`}>
+      <div className={`relative h-[30px] sm:h-[38px] lg:h-[46px] w-full bg-gradient-to-br ${HEADER_GRADIENTS[card.cardBonus]} flex items-start justify-between px-1.5 sm:px-2 pt-1 sm:pt-1.5`}>
         {/* Prestige number */}
-        <span className={`text-xl font-extrabold drop-shadow-sm ${PRESTIGE_TEXT[card.cardBonus]}`}>
+        <span className={`text-base sm:text-lg lg:text-xl font-extrabold drop-shadow-sm ${PRESTIGE_TEXT[card.cardBonus]}`}>
           {card.cardPrestige > 0 ? card.cardPrestige : ''}
         </span>
         {/* Bonus gem circle */}
-        <div className={`w-7 h-7 rounded-full ${BONUS_COLORS[card.cardBonus]} flex items-center justify-center shadow-sm`}>
-          <div className="w-3 h-3 rounded-full bg-white/30" />
+        <div className={`w-5 sm:w-6 lg:w-7 h-5 sm:h-6 lg:h-7 rounded-full ${BONUS_COLORS[card.cardBonus]} flex items-center justify-center shadow-sm`}>
+          <div className="w-2 sm:w-2.5 lg:w-3 h-2 sm:h-2.5 lg:h-3 rounded-full bg-white/30" />
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export function CardDisplay({ card, onClick, highlight, selected }: Props) {
         <div className="flex flex-col gap-0.5">
           {costEntries.map((color) => (
             <div key={color} className="flex items-center gap-1">
-              <div className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold shadow-sm ${COST_PILL_COLORS[color]}`}>
+              <div className={`w-4 sm:w-4.5 lg:w-5 h-4 sm:h-4.5 lg:h-5 rounded-full text-[10px] sm:text-xs flex items-center justify-center font-bold shadow-sm ${COST_PILL_COLORS[color]}`}>
                 {card.cardCost[color]}
               </div>
             </div>

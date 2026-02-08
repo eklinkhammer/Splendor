@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { GameResult } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useGameStore } from '../../stores/gameStore';
+import { playAgain } from '../../services/api';
 
 interface Props {
   result: GameResult;
@@ -12,13 +14,45 @@ const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 export function GameOverOverlay({ result }: Props) {
   const navigate = useNavigate();
   const clearSession = useSessionStore((s) => s.clear);
+  const setSession = useSessionStore((s) => s.setSession);
+  const setLobbyId = useSessionStore((s) => s.setLobbyId);
+  const setGameId = useSessionStore((s) => s.setGameId);
+  const playerName = useSessionStore((s) => s.playerName);
   const resetGame = useGameStore((s) => s.reset);
   const gameView = useGameStore((s) => s.gameView);
+  const [playingAgain, setPlayingAgain] = useState(false);
 
   const handleReturn = () => {
     resetGame();
     clearSession();
     navigate('/');
+  };
+
+  const handlePlayAgain = async () => {
+    if (!gameView || !playerName) return;
+    setPlayingAgain(true);
+    try {
+      const aiCount = gameView.pgvPlayers.filter((p) =>
+        p.ppPlayerName.startsWith('AI Player'),
+      ).length;
+      const hasHumans = gameView.pgvPlayers.length - aiCount > 1;
+
+      const res = await playAgain(playerName, `${playerName}'s Game`, aiCount);
+      resetGame();
+      setSession(res.sessionId, playerName);
+      setLobbyId(res.lobbyId);
+
+      if (hasHumans) {
+        // Has other human players — go to lobby so they can rejoin
+        navigate('/');
+      } else {
+        // All-AI game — jump straight into the new game
+        setGameId(res.gameId);
+        navigate(`/game/${res.gameId}`);
+      }
+    } catch {
+      setPlayingAgain(false);
+    }
   };
 
   const rankedPlayers = gameView
@@ -29,7 +63,7 @@ export function GameOverOverlay({ result }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-10 shadow-2xl text-center max-w-md border border-amber-500/30">
+      <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-4 sm:p-6 lg:p-10 shadow-2xl text-center max-w-[calc(100vw-2rem)] sm:max-w-md border border-amber-500/30">
         <div className="text-5xl mb-3">🏆</div>
         <h2 className="text-2xl font-extrabold text-gray-100 mb-2">Game Over!</h2>
         <p className="text-xl mb-6 text-gray-200">
@@ -68,14 +102,25 @@ export function GameOverOverlay({ result }: Props) {
           })}
         </div>
 
-        <button
-          onClick={handleReturn}
-          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl
-            hover:from-blue-700 hover:to-blue-800 font-semibold shadow-md
-            transition-all duration-200 hover:shadow-lg"
-        >
-          Return to Lobby
-        </button>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={handlePlayAgain}
+            disabled={playingAgain}
+            className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl
+              hover:from-green-700 hover:to-green-800 font-semibold shadow-md
+              transition-all duration-200 hover:shadow-lg disabled:opacity-50"
+          >
+            {playingAgain ? 'Setting up...' : 'Play Again'}
+          </button>
+          <button
+            onClick={handleReturn}
+            className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl
+              hover:from-blue-700 hover:to-blue-800 font-semibold shadow-md
+              transition-all duration-200 hover:shadow-lg"
+          >
+            Return to Lobby
+          </button>
+        </div>
       </div>
     </div>
   );

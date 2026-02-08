@@ -27,6 +27,9 @@ module Splendor.Server.Types
   , ManagedGame(..)
   , ServerState(..)
   , newServerState
+    -- * Spectator
+  , SpectatorId
+  , toSpectatorGameView
     -- * Utilities
   , newUUID
   ) where
@@ -48,9 +51,10 @@ import Splendor.Core.Types
 -- Identifiers
 -- -----------------------------------------------------------------
 
-type GameId    = Text
-type SessionId = Text
-type LobbyId   = Text
+type GameId      = Text
+type SessionId   = Text
+type LobbyId     = Text
+type SpectatorId = Text
 
 -- -----------------------------------------------------------------
 -- Lobby types
@@ -184,6 +188,10 @@ toPublicPlayer viewerId p = PublicPlayer
   , ppPrestige      = playerPrestige p
   }
 
+-- | Build a spectator view (no reserved cards visible).
+toSpectatorGameView :: GameState -> PublicGameView
+toSpectatorGameView = toPublicGameView ""
+
 -- -----------------------------------------------------------------
 -- WebSocket messages
 -- -----------------------------------------------------------------
@@ -192,6 +200,7 @@ data ClientMessage
   = SubmitAction Action
   | ReturnGems GemCollection
   | ChooseNoble NobleId
+  | SendChat Text
   | Ping
   deriving stock (Eq, Show, Generic)
   deriving anyclass (ToJSON, FromJSON)
@@ -202,6 +211,7 @@ data ServerMessage
   | GemReturnNeeded Int [GemCollection]
   | NobleChoiceRequired [Noble]
   | GameOverMsg GameResult
+  | ChatMessage Text Text  -- (senderName, messageText)
   | ErrorMsg Text
   | Pong
   deriving stock (Eq, Show, Generic)
@@ -215,6 +225,7 @@ data ManagedGame = ManagedGame
   { mgGameState     :: GameState
   , mgSessions      :: Map SessionId PlayerSession
   , mgConnections   :: Map SessionId (TChan ServerMessage)
+  , mgSpectators    :: Map SpectatorId (TChan ServerMessage)
   , mgStatus        :: GameStatus
   , mgPendingNobles :: Maybe [Noble]  -- ^ Pending noble choice (survives reconnect)
   , mgAIThreads    :: [ThreadId]     -- ^ AI player threads for lifecycle management

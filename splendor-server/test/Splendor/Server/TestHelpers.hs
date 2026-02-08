@@ -189,7 +189,7 @@ startH :: ServerState -> LobbyId -> Handler StartGameResponse
 startH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
 
 addAIH :: ServerState -> LobbyId -> Handler LobbySlot
-addAIH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> _ :<|> h) = lobbyServer ss in h
+addAIH ss = let (_ :<|> _ :<|> _ :<|> _ :<|> _ :<|> h :<|> _) = lobbyServer ss in h
 
 getGameH :: ServerState -> GameId -> SessionId -> Handler PublicGameView
 getGameH ss = let (h :<|> _) = gameServer ss in h

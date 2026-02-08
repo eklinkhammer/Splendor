@@ -23,11 +23,11 @@ interface Props {
 export function GemBank({ bank, onGemClick, selectedGemCounts = {}, availableGemColors, takeAction }: Props) {
   const goldCount = bank['Gold'] ?? 0;
   return (
-    <div className="bg-[var(--board-felt-light)] rounded-xl px-4 py-3">
+    <div className="bg-[var(--board-felt-light)] rounded-xl px-2 py-2 sm:px-3 sm:py-2.5 lg:px-4 lg:py-3">
       <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 text-center">
         Gem Bank
       </div>
-      <div className="flex gap-3 justify-center">
+      <div className="flex gap-1.5 sm:gap-2 lg:gap-3 justify-center">
         {ALL_GEM_COLORS.map((color) => {
           const count = bank[color] ?? 0;
           const selCount = selectedGemCounts[color] ?? 0;

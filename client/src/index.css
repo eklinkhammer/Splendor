@@ -12,5 +12,34 @@
   --board-felt: #1a5c2a;
   --board-felt-light: #236b35;
   --card-bg: #fefce8;
-  --card-height: 156px;
+
+  /* Responsive sizing — mobile-first */
+  --card-width: 64px;
+  --card-height: 90px;
+  --noble-width: 64px;
+  --noble-height: 76px;
+  --gem-size-md: 36px;
+  --gem-size-sm: 26px;
+}
+
+@media (min-width: 640px) {
+  :root {
+    --card-width: 88px;
+    --card-height: 124px;
+    --noble-width: 80px;
+    --noble-height: 96px;
+    --gem-size-md: 40px;
+    --gem-size-sm: 28px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --card-width: 112px;
+    --card-height: 156px;
+    --noble-width: 96px;
+    --noble-height: 112px;
+    --gem-size-md: 48px;
+    --gem-size-sm: 32px;
+  }
 }
