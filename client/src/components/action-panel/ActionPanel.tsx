@@ -1,9 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { PublicGameView, ClientMessage, CardId, Tier } from '../../types';
+import type { PublicGameView, ClientMessage, CardId, Tier, Action, GemColor } from '../../types';
 import { useGameStore } from '../../stores/gameStore';
-import { TakeGemsPanel } from './TakeGemsPanel';
-import { getBuyableCardIds } from './BuyCardPanel';
-import { getReservableCardIds } from './ReserveCardPanel';
 import { GemReturnPanel } from './GemReturnPanel';
 import { NobleChoicePanel } from './NobleChoicePanel';
 
@@ -69,12 +66,8 @@ export function ActionPanel({ gameView, selfPlayerId, send }: Props) {
   }
 
   return (
-    <div className="space-y-3">
-      <TakeGemsPanel
-        legalActions={legalActions}
-        board={gameView.pgvBoard}
-        send={send}
-      />
+    <div className="text-center py-3">
+      <p className="text-sm text-gray-400">Select gems or cards on the board</p>
     </div>
   );
 }
@@ -86,6 +79,9 @@ export function useActionCallbacks(
   const legalActions = useGameStore((s) => s.legalActions);
   const [selectedCardId, setSelectedCardId] = useState<CardId | null>(null);
   const [selectedDeckTier, setSelectedDeckTier] = useState<Tier | null>(null);
+  const [selectedBankGems, setSelectedBankGems] = useState<GemColor[]>([]);
+
+  // --- Card/deck logic (unchanged) ---
 
   const buyableIds = useMemo(() => getBuyableCardIds(legalActions), [legalActions]);
   const reservableIds = useMemo(() => getReservableCardIds(legalActions), [legalActions]);
@@ -101,7 +97,6 @@ export function useActionCallbacks(
     return tiers;
   }, [legalActions]);
 
-  // Find the buy/reserve actions for the currently selected card
   const selectedBuyAction = useMemo(() => {
     if (!selectedCardId) return null;
     return legalActions.find(
@@ -132,10 +127,109 @@ export function useActionCallbacks(
     ) ?? null;
   }, [legalActions, selectedDeckTier]);
 
+  // --- Gem taking logic ---
+
+  const availableDiffColors = useMemo(() => {
+    const colors = new Set<GemColor>();
+    for (const a of legalActions) {
+      if (a.tag === 'TakeGems' && a.contents.tag === 'TakeDifferent') {
+        for (const c of a.contents.contents) {
+          colors.add(c);
+        }
+      }
+    }
+    return colors;
+  }, [legalActions]);
+
+  const availableTwoColors = useMemo(() => {
+    const colors = new Set<GemColor>();
+    for (const a of legalActions) {
+      if (a.tag === 'TakeGems' && a.contents.tag === 'TakeTwoSame') {
+        colors.add(a.contents.contents);
+      }
+    }
+    return colors;
+  }, [legalActions]);
+
+  const availableGemColors = useMemo(() => {
+    const colors = new Set<GemColor>();
+    for (const c of availableDiffColors) colors.add(c);
+    for (const c of availableTwoColors) colors.add(c);
+    return colors;
+  }, [availableDiffColors, availableTwoColors]);
+
+  const matchedTakeAction = useMemo((): Action | null => {
+    if (selectedBankGems.length === 0) return null;
+
+    // Check take-two-same: all same color, length 2
+    if (selectedBankGems.length === 2 && selectedBankGems[0] === selectedBankGems[1]) {
+      const color = selectedBankGems[0];
+      return legalActions.find(
+        (a) => a.tag === 'TakeGems' && a.contents.tag === 'TakeTwoSame' && a.contents.contents === color,
+      ) ?? null;
+    }
+
+    // Check take-different: all different colors
+    const uniqueColors = new Set(selectedBankGems);
+    if (uniqueColors.size !== selectedBankGems.length) return null; // duplicates but not a valid take-two
+
+    return legalActions.find((a) => {
+      if (a.tag !== 'TakeGems' || a.contents.tag !== 'TakeDifferent') return false;
+      const gems = a.contents.contents;
+      return gems.length === selectedBankGems.length && selectedBankGems.every((c) => gems.includes(c));
+    }) ?? null;
+  }, [legalActions, selectedBankGems]);
+
+  // --- Callbacks ---
+
   const clearSelection = useCallback(() => {
     setSelectedCardId(null);
     setSelectedDeckTier(null);
+    setSelectedBankGems([]);
   }, []);
+
+  const onBankGemClick = useCallback(
+    (color: GemColor) => {
+      // Clear card/deck selection when interacting with gems
+      setSelectedCardId(null);
+      setSelectedDeckTier(null);
+
+      setSelectedBankGems((current) => {
+        const countOfColor = current.filter((c) => c === color).length;
+
+        if (countOfColor === 2) {
+          // Already double-selected, toggle off entirely
+          return [];
+        }
+
+        if (countOfColor === 1) {
+          const otherGems = current.filter((c) => c !== color);
+          if (otherGems.length === 0 && availableTwoColors.has(color)) {
+            // Only this color selected, and take-two is legal → select second
+            return [color, color];
+          }
+          // Deselect this color
+          return otherGems;
+        }
+
+        // countOfColor === 0: adding a new color
+        if (current.length === 2 && current[0] === current[1]) {
+          // Was a take-two, switching to different mode — start fresh
+          return [color];
+        }
+
+        return [...current, color];
+      });
+    },
+    [availableTwoColors],
+  );
+
+  const handleTakeGems = useCallback(() => {
+    if (matchedTakeAction) {
+      send({ tag: 'SubmitAction', contents: matchedTakeAction });
+      clearSelection();
+    }
+  }, [matchedTakeAction, send, clearSelection]);
 
   const handleBuy = useCallback(() => {
     if (selectedBuyAction) {
@@ -163,6 +257,7 @@ export function useActionCallbacks(
       if (buyableIds.has(cardId) || reservableIds.has(cardId)) {
         setSelectedCardId(cardId);
         setSelectedDeckTier(null);
+        setSelectedBankGems([]);
       }
     },
     [buyableIds, reservableIds],
@@ -173,6 +268,7 @@ export function useActionCallbacks(
       if (reservableDeckTiers.has(tier)) {
         setSelectedDeckTier(tier);
         setSelectedCardId(null);
+        setSelectedBankGems([]);
       }
     },
     [reservableDeckTiers],
@@ -181,16 +277,46 @@ export function useActionCallbacks(
   return {
     selectedCardId,
     selectedDeckTier,
+    selectedBankGems,
     clearSelection,
     highlightCards,
     reservableDeckTiers,
     onCardClick,
     onDeckClick,
+    onBankGemClick,
     selectedBuyAction,
     selectedReserveAction,
     selectedDeckReserveAction,
+    matchedTakeAction,
     handleBuy,
     handleReserve,
     handleDeckReserve,
+    handleTakeGems,
+    availableGemColors,
   };
+}
+
+// --- Helpers moved from removed panel imports ---
+
+function getBuyableCardIds(legalActions: Action[]): Set<CardId> {
+  const ids = new Set<CardId>();
+  for (const a of legalActions) {
+    if (a.tag === 'BuyCard') {
+      const src = a.contents[0];
+      if (src.tag === 'FromDisplay' || src.tag === 'FromReserve') {
+        ids.add(src.contents);
+      }
+    }
+  }
+  return ids;
+}
+
+function getReservableCardIds(legalActions: Action[]): Set<CardId> {
+  const ids = new Set<CardId>();
+  for (const a of legalActions) {
+    if (a.tag === 'ReserveCard' && a.contents.tag === 'FromDisplay') {
+      ids.add(a.contents.contents);
+    }
+  }
+  return ids;
 }

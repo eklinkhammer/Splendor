@@ -14,15 +14,23 @@ interface Props {
   count: number;
   onClick?: () => void;
   selected?: boolean;
+  selectedCount?: number;
   size?: 'sm' | 'md';
 }
 
-export function GemToken({ token, count, onClick, selected, size = 'md' }: Props) {
+export function GemToken({ token, count, onClick, selected, selectedCount, size = 'md' }: Props) {
   const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-base';
+  const effectiveCount = selectedCount ?? (selected ? 1 : 0);
+  const selectionClass =
+    effectiveCount >= 2
+      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 outline outline-2 outline-offset-[6px] outline-amber-400'
+      : effectiveCount === 1
+        ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900'
+        : 'ring-1 ring-inset ring-white/30';
   const className = `${sizeClass} rounded-full border-2 font-bold flex items-center justify-center
         shadow-md relative
         ${TOKEN_STYLES[token]}
-        ${selected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900' : 'ring-1 ring-inset ring-white/30'}
+        ${selectionClass}
         ${onClick ? 'cursor-pointer hover:scale-110 hover:shadow-lg transition-all duration-150' : 'cursor-default'}`;
   const Tag = onClick ? 'button' : 'div';
   return (

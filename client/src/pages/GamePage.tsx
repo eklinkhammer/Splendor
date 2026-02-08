@@ -5,6 +5,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useGameStore } from '../stores/gameStore';
 import { getGame } from '../services/api';
 import { toDisplayEntries } from '../types';
+import type { GemColor } from '../types';
 import { GameBoard } from '../components/game-board/GameBoard';
 import { GameStatus } from '../components/game-board/GameStatus';
 import { PlayerArea } from '../components/player-area/PlayerArea';
@@ -53,17 +54,47 @@ export function GamePage() {
   const {
     selectedCardId,
     selectedDeckTier,
+    selectedBankGems,
     clearSelection,
     highlightCards,
     reservableDeckTiers,
     onCardClick,
     onDeckClick,
+    onBankGemClick,
     selectedBuyAction,
     selectedReserveAction,
     handleBuy,
     handleReserve,
     handleDeckReserve,
+    matchedTakeAction,
+    handleTakeGems,
+    availableGemColors,
   } = useActionCallbacks(send);
+
+  // Build selectedGemCounts map from selectedBankGems array
+  const selectedGemCounts = useMemo(() => {
+    const counts: Partial<Record<GemColor, number>> = {};
+    for (const color of selectedBankGems) {
+      counts[color] = (counts[color] ?? 0) + 1;
+    }
+    return counts;
+  }, [selectedBankGems]);
+
+  // Build the Take button for the gem bank
+  const bankTakeAction = useMemo(() => {
+    if (selectedBankGems.length === 0) return undefined;
+    return (
+      <div className="flex justify-center mt-2">
+        <button
+          onClick={handleTakeGems}
+          disabled={!matchedTakeAction}
+          className="px-6 py-1.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm rounded-xl font-semibold shadow-md transition-all duration-200 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Take
+        </button>
+      </div>
+    );
+  }, [selectedBankGems.length, matchedTakeAction, handleTakeGems]);
 
   // Build the card action overlay for the currently selected card
   const selectedCardOverlay = useMemo(() => {
@@ -97,7 +128,7 @@ export function GamePage() {
         paymentBreakdown={paymentBreakdown}
       />
     );
-  }, [selectedCardId, selectedBuyAction, selectedReserveAction, handleBuy, handleReserve, clearSelection, gameView, selfPlayerId]);
+  }, [selectedCardId, selectedBuyAction, selectedReserveAction, handleBuy, handleReserve, clearSelection, gameView]);
 
   // Build the deck action overlay for the currently selected deck
   const selectedDeckOverlay = useMemo(() => {
@@ -160,6 +191,10 @@ export function GamePage() {
               selectedDeckTier={selectedDeckTier}
               selectedDeckOverlay={selectedDeckOverlay}
               reservableDeckTiers={reservableDeckTiers}
+              onBankGemClick={onBankGemClick}
+              selectedGemCounts={selectedGemCounts}
+              availableGemColors={availableGemColors}
+              bankTakeAction={bankTakeAction}
             />
             <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
               <ActionPanel

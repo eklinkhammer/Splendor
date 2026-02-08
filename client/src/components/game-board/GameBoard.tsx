@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { PublicBoard, CardId, Tier } from '../../types';
+import type { PublicBoard, CardId, Tier, GemColor } from '../../types';
 import { NobleRow } from './NobleRow';
 import { TierRow } from './TierRow';
 import { GemBank } from './GemBank';
@@ -14,6 +14,10 @@ interface Props {
   selectedDeckTier?: Tier | null;
   selectedDeckOverlay?: ReactNode;
   reservableDeckTiers?: Set<Tier>;
+  onBankGemClick?: (color: GemColor) => void;
+  selectedGemCounts?: Partial<Record<GemColor, number>>;
+  availableGemColors?: Set<GemColor>;
+  bankTakeAction?: ReactNode;
 }
 
 export function GameBoard({
@@ -26,6 +30,10 @@ export function GameBoard({
   selectedDeckTier,
   selectedDeckOverlay,
   reservableDeckTiers,
+  onBankGemClick,
+  selectedGemCounts,
+  availableGemColors,
+  bankTakeAction,
 }: Props) {
   return (
     <div className="bg-[var(--board-felt)] rounded-xl p-6 shadow-inner space-y-4">
@@ -79,7 +87,13 @@ export function GameBoard({
       <div className="border-t border-white/10" />
 
       {/* Gem bank */}
-      <GemBank bank={board.publicBank} />
+      <GemBank
+        bank={board.publicBank}
+        onGemClick={onBankGemClick}
+        selectedGemCounts={selectedGemCounts}
+        availableGemColors={availableGemColors}
+        takeAction={bankTakeAction}
+      />
     </div>
   );
 }
