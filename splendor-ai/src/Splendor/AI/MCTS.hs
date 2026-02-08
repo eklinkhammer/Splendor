@@ -69,27 +69,26 @@ instance Agent MCTSAgent where
   chooseAction :: MCTSAgent -> GameState -> [Action] -> IO Action
   chooseAction _ _ [] = error "chooseAction: no legal actions"
   chooseAction _ _ [a] = pure a  -- skip search for singleton
-  chooseAction agent gs _actions = do
+  chooseAction agent gs (fallback:_) = do
     let perspective = gsCurrentPlayer gs
     root <- runMCTS (mctsConfig agent) gs perspective
     case bestChild root of
       Just (MCTSChild (MoveAction act) _) -> pure act
-      -- If bestChild is a noble pre-expansion, just return first action
-      Just (MCTSChild _ _) -> error "chooseAction: unexpected move type from MCTS"
-      Nothing -> error "chooseAction: MCTS produced no children"
+      -- Unexpected move type or no children — fall back to first legal action
+      _ -> pure fallback
 
   chooseGemReturn :: MCTSAgent -> GameState -> [GemCollection] -> IO GemCollection
   chooseGemReturn _ _ [] = error "chooseGemReturn: no options"
   chooseGemReturn _ _ [r] = pure r
-  chooseGemReturn agent gs _options = do
+  chooseGemReturn agent gs (fallback:_) = do
     -- Use a shorter search for gem return decisions
     let shortConfig = (mctsConfig agent) { mctsIterations = 100, mctsTimeoutMs = 500 }
         perspective = gsCurrentPlayer gs
     root <- runMCTS shortConfig gs perspective
     case bestChild root of
       Just (MCTSChild (MoveGemReturn ret) _) -> pure ret
-      Just (MCTSChild _ _) -> error "chooseGemReturn: unexpected move type from MCTS"
-      Nothing -> error "chooseGemReturn: MCTS produced no children"
+      -- Unexpected move type or no children — fall back to first option
+      _ -> pure fallback
 
   chooseNoble :: MCTSAgent -> GameState -> [Noble] -> IO Noble
   chooseNoble _ _ [] = error "chooseNoble: no nobles"
