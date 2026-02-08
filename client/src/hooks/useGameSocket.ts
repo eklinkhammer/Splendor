@@ -1,7 +1,7 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { connectGame, connectSpectator, type GameSocket } from '../services/websocket';
 import { useGameStore } from '../stores/gameStore';
-import type { ClientMessage } from '../types';
+import type { ClientMessage, ServerMessage } from '../types';
 
 interface SessionEntry {
   sessionId: string;
@@ -20,6 +20,7 @@ export function useGameSocket(
   const handleMessage = useGameStore((s) => s.handleServerMessage);
   const setConnected = useGameStore((s) => s.setConnected);
 
+  const sessionsKey = useMemo(() => sessions.map((s) => s.sessionId).join(','), [sessions]);
   const totalExpected = spectator ? 1 : sessions.length;
 
   const updateConnected = useCallback(() => {
@@ -29,7 +30,7 @@ export function useGameSocket(
   const connectOne = useCallback((key: string, isSpectator: boolean, sessionId?: string) => {
     if (!gameId || !mountedRef.current) return;
 
-    const onMessage = (msg: Parameters<typeof handleMessage>[1]) => {
+    const onMessage = (msg: ServerMessage) => {
       handleMessage(key, msg);
       retriesRef.current.set(key, 0);
     };
@@ -87,8 +88,7 @@ export function useGameSocket(
       setConnected(false);
     };
     // Re-connect when gameId or session list changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, spectator, sessions.map((s) => s.sessionId).join(',')]);
+  }, [gameId, spectator, sessionsKey, connectOne, setConnected]);
 
   const send = useCallback((msg: ClientMessage) => {
     // In hotseat mode, send through the active session's socket

@@ -18,6 +18,8 @@ export function GameOverOverlay({ result }: Props) {
   const setLobbyId = useSessionStore((s) => s.setLobbyId);
   const setGameId = useSessionStore((s) => s.setGameId);
   const playerName = useSessionStore((s) => s.playerName);
+  const localSessions = useSessionStore((s) => s.localSessions);
+  const addLocalSession = useSessionStore((s) => s.addLocalSession);
   const resetGame = useGameStore((s) => s.reset);
   const gameView = useGameStore((s) => s.gameView);
   const [playingAgain, setPlayingAgain] = useState(false);
@@ -32,21 +34,24 @@ export function GameOverOverlay({ result }: Props) {
     if (!gameView || !playerName) return;
     setPlayingAgain(true);
     try {
-      const aiCount = gameView.pgvPlayers.filter((p) =>
-        p.ppPlayerName.startsWith('AI Player'),
-      ).length;
-      const hasHumans = gameView.pgvPlayers.length - aiCount > 1;
+      const localPlayerNames = localSessions.map((s) => s.playerName);
+      const totalLocalHumans = 1 + localPlayerNames.length; // creator + local players
+      const aiCount = gameView.pgvPlayers.length - totalLocalHumans;
+      const hasRemoteHumans = gameView.pgvPlayers.length > totalLocalHumans + aiCount;
 
-      const res = await playAgain(playerName, `${playerName}'s Game`, aiCount);
+      const res = await playAgain(playerName, `${playerName}'s Game`, aiCount, localPlayerNames);
       resetGame();
       setSession(res.sessionId, playerName);
       setLobbyId(res.lobbyId);
+      for (const ls of res.localSessions) {
+        addLocalSession(ls.sessionId, ls.playerName);
+      }
 
-      if (hasHumans) {
-        // Has other human players — go to lobby so they can rejoin
+      if (hasRemoteHumans) {
+        // Has remote human players — go to lobby so they can rejoin
         navigate('/');
       } else {
-        // All-AI game — jump straight into the new game
+        // All local (hotseat + AI) — jump straight into the new game
         setGameId(res.gameId);
         navigate(`/game/${res.gameId}`);
       }

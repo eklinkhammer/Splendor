@@ -162,6 +162,7 @@ export function GamePage() {
       reset();
       useSessionStore.getState().setGameId(null);
       useSessionStore.getState().setLobbyId(null);
+      useSessionStore.getState().clearLocalSessions();
     };
   }, [reset]);
 
