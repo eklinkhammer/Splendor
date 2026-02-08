@@ -30,8 +30,13 @@ interface GameState {
   connected: boolean;
   selfPlayerId: PlayerId | null;
 
+  // Hotseat multiplayer
+  localPlayerIds: PlayerId[];
+  activeSessionId: string | null;
+  sessionPlayerMap: Record<string, PlayerId>;
+
   setConnected: (connected: boolean) => void;
-  handleServerMessage: (msg: ServerMessage) => void;
+  handleServerMessage: (sessionId: string, msg: ServerMessage) => void;
   clearError: () => void;
   reset: () => void;
 }
@@ -49,27 +54,45 @@ export const useGameStore = create<GameState>()((set, get) => ({
   error: null,
   connected: false,
   selfPlayerId: null,
+  localPlayerIds: [],
+  activeSessionId: null,
+  sessionPlayerMap: {},
 
   setConnected: (connected) => set({ connected }),
 
-  handleServerMessage: (msg) => {
+  handleServerMessage: (sessionId, msg) => {
     switch (msg.tag) {
       case 'GameStateUpdate': {
         const view = msg.contents;
-        let selfId = get().selfPlayerId;
-        // Derive self from the player whose ppReserved is not null
-        if (!selfId) {
-          const selfPlayer = view.pgvPlayers.find((p) => p.ppReserved !== null);
-          if (selfPlayer) {
-            selfId = selfPlayer.ppPlayerId;
-          }
+        const state = get();
+
+        // Derive playerId for this session from ppReserved
+        const selfPlayer = view.pgvPlayers.find((p) => p.ppReserved !== null);
+        const sessionPlayerId = selfPlayer?.ppPlayerId ?? null;
+
+        // Update session → player mapping
+        const newMap = { ...state.sessionPlayerMap };
+        if (sessionPlayerId) {
+          newMap[sessionId] = sessionPlayerId;
         }
 
-        const prev = get().previousGameView;
-        let newMoveLog = get().moveLog;
-        let newLastMove = get().lastMove;
+        // Collect all known local player IDs
+        const newLocalPlayerIds = [...new Set(Object.values(newMap))];
 
-        if (prev && view.pgvTurnNumber > prev.pgvTurnNumber) {
+        // Determine who the current turn player is
+        const currentTurnPlayerId = view.pgvPlayers[view.pgvCurrentPlayer]?.ppPlayerId;
+        const isLocalPlayerTurn = currentTurnPlayerId != null && newLocalPlayerIds.includes(currentTurnPlayerId);
+
+        // Use this view if:
+        // 1. It's this session's player's turn, OR
+        // 2. No game view yet (first load)
+        const useThisView = !state.gameView || (sessionPlayerId === currentTurnPlayerId);
+
+        const prev = state.previousGameView;
+        let newMoveLog = state.moveLog;
+        let newLastMove = state.lastMove;
+
+        if (useThisView && prev && view.pgvTurnNumber > prev.pgvTurnNumber) {
           const entry = computeMoveLogEntry(prev, view);
           if (entry) {
             newMoveLog = [...newMoveLog, entry];
@@ -77,34 +100,46 @@ export const useGameStore = create<GameState>()((set, get) => ({
           }
         }
 
-        set({
-          gameView: view,
-          previousGameView: (prev && view.pgvTurnNumber === prev.pgvTurnNumber)
-            ? prev   // keep start-of-turn snapshot
-            : view,  // new turn started (or first snapshot)
-          moveLog: newMoveLog,
-          lastMove: newLastMove,
-          selfPlayerId: selfId,
-          legalActions: [],
-          gemReturnInfo: null,
-          nobleChoices: null,
-          error: null,
-        });
+        if (useThisView) {
+          set({
+            gameView: view,
+            previousGameView: (prev && view.pgvTurnNumber === prev.pgvTurnNumber)
+              ? prev
+              : view,
+            moveLog: newMoveLog,
+            lastMove: newLastMove,
+            selfPlayerId: isLocalPlayerTurn ? currentTurnPlayerId : (sessionPlayerId ?? state.selfPlayerId),
+            legalActions: [],
+            gemReturnInfo: null,
+            nobleChoices: null,
+            error: null,
+            sessionPlayerMap: newMap,
+            localPlayerIds: newLocalPlayerIds,
+          });
+        } else {
+          // Still update the mapping even if we don't switch the view
+          set({
+            sessionPlayerMap: newMap,
+            localPlayerIds: newLocalPlayerIds,
+          });
+        }
         break;
       }
       case 'ActionRequired':
-        set({ legalActions: msg.contents });
+        set({ legalActions: msg.contents, activeSessionId: sessionId });
         break;
       case 'GemReturnNeeded':
         set({
           gemReturnInfo: { amount: msg.contents[0], options: msg.contents[1] },
           legalActions: [],
+          activeSessionId: sessionId,
         });
         break;
       case 'NobleChoiceRequired':
         set({
           nobleChoices: msg.contents,
           legalActions: [],
+          activeSessionId: sessionId,
         });
         break;
       case 'GameOverMsg':
@@ -137,5 +172,8 @@ export const useGameStore = create<GameState>()((set, get) => ({
       error: null,
       connected: false,
       selfPlayerId: null,
+      localPlayerIds: [],
+      activeSessionId: null,
+      sessionPlayerMap: {},
     }),
 }));

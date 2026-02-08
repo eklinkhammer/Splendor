@@ -8,6 +8,7 @@ import { useGameStore } from '../stores/gameStore';
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ id: 'game-1' }),
   useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/game/game-1' }),
 }));
 
 // Mock useGameSocket — avoid real WebSocket connections

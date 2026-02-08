@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { getLobby, startGame, addAI, leaveLobby } from '../../services/api';
+import { getLobby, startGame, addAI, leaveLobby, joinLobby } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import type { Lobby } from '../../types';
 
@@ -14,8 +14,13 @@ export function LobbyDetail({ lobbyId }: Props) {
   const [starting, setStarting] = useState(false);
   const [addingAI, setAddingAI] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [addingLocal, setAddingLocal] = useState(false);
+  const [localNameInput, setLocalNameInput] = useState('');
+  const [showLocalInput, setShowLocalInput] = useState(false);
   const navigate = useNavigate();
   const sessionId = useSessionStore((s) => s.sessionId);
+  const localSessions = useSessionStore((s) => s.localSessions);
+  const addLocalSession = useSessionStore((s) => s.addLocalSession);
   const clearSession = useSessionStore((s) => s.clear);
   const setGameId = useSessionStore((s) => s.setGameId);
 
@@ -74,6 +79,25 @@ export function LobbyDetail({ lobbyId }: Props) {
     }
   };
 
+  const handleAddLocal = async () => {
+    const name = localNameInput.trim();
+    if (!name) return;
+    setAddingLocal(true);
+    setError(null);
+    try {
+      const res = await joinLobby(lobbyId, name);
+      addLocalSession(res.jlrSessionId, name);
+      setLocalNameInput('');
+      setShowLocalInput(false);
+      const data = await getLobby(lobbyId);
+      setLobby(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add local player');
+    } finally {
+      setAddingLocal(false);
+    }
+  };
+
   const handleLeave = async () => {
     if (!sessionId) return;
     setLeaving(true);
@@ -93,9 +117,10 @@ export function LobbyDetail({ lobbyId }: Props) {
     return <p className="text-gray-400">Loading lobby...</p>;
   }
 
+  const localSessionIds = new Set(localSessions.map((s) => s.sessionId));
   const isCreator = lobby.lobbySlots[0]?.lsSessionId === sessionId;
   const canStart = isCreator && lobby.lobbySlots.length >= lobby.lobbyMinPlayers;
-  const canAddAI = isCreator && lobby.lobbySlots.length < lobby.lobbyMaxPlayers;
+  const canAddMore = isCreator && lobby.lobbySlots.length < lobby.lobbyMaxPlayers;
 
   return (
     <div className="space-y-4">
@@ -117,6 +142,9 @@ export function LobbyDetail({ lobbyId }: Props) {
               {slot.lsSessionId === sessionId && (
                 <span className="text-xs text-blue-400">(you)</span>
               )}
+              {localSessionIds.has(slot.lsSessionId) && (
+                <span className="text-xs text-teal-400 font-medium">(local)</span>
+              )}
             </li>
           ))}
         </ul>
@@ -132,14 +160,52 @@ export function LobbyDetail({ lobbyId }: Props) {
       )}
       {lobby.lobbyStatus.tag === 'Waiting' && (
         <div className="space-y-2">
-          {canAddAI && (
-            <button
-              onClick={handleAddAI}
-              disabled={addingAI}
-              className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+          {canAddMore && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddAI}
+                disabled={addingAI}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+              >
+                {addingAI ? 'Adding...' : 'Add AI Player'}
+              </button>
+              <button
+                onClick={() => setShowLocalInput(true)}
+                disabled={addingLocal || showLocalInput}
+                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50"
+              >
+                Add Local Player
+              </button>
+            </div>
+          )}
+          {showLocalInput && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); handleAddLocal(); }}
+              className="flex gap-2"
             >
-              {addingAI ? 'Adding...' : 'Add AI Player'}
-            </button>
+              <input
+                type="text"
+                value={localNameInput}
+                onChange={(e) => setLocalNameInput(e.target.value)}
+                placeholder="Player name"
+                autoFocus
+                className="flex-1 px-3 py-2 bg-gray-700 text-white rounded border border-gray-600 focus:border-teal-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={addingLocal || !localNameInput.trim()}
+                className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50"
+              >
+                {addingLocal ? 'Adding...' : 'Join'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowLocalInput(false); setLocalNameInput(''); }}
+                className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </form>
           )}
           {canStart ? (
             <button

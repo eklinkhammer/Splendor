@@ -3,63 +3,103 @@ import { connectGame, connectSpectator, type GameSocket } from '../services/webs
 import { useGameStore } from '../stores/gameStore';
 import type { ClientMessage } from '../types';
 
+interface SessionEntry {
+  sessionId: string;
+}
+
 export function useGameSocket(
   gameId: string | null,
-  sessionId: string | null,
+  sessions: SessionEntry[],
   spectator?: boolean,
 ) {
-  const socketRef = useRef<GameSocket | null>(null);
-  const retriesRef = useRef(0);
+  const socketsRef = useRef<Map<string, GameSocket>>(new Map());
+  const retriesRef = useRef<Map<string, number>>(new Map());
+  const openRef = useRef<Set<string>>(new Set());
   const mountedRef = useRef(true);
 
   const handleMessage = useGameStore((s) => s.handleServerMessage);
   const setConnected = useGameStore((s) => s.setConnected);
 
-  const connect = useCallback(() => {
-    if (!gameId || !mountedRef.current) return;
-    if (!spectator && !sessionId) return;
+  const totalExpected = spectator ? 1 : sessions.length;
 
-    const onMessage = (msg: Parameters<typeof handleMessage>[0]) => {
-      handleMessage(msg);
-      retriesRef.current = 0;
+  const updateConnected = useCallback(() => {
+    setConnected(openRef.current.size >= totalExpected && totalExpected > 0);
+  }, [setConnected, totalExpected]);
+
+  const connectOne = useCallback((key: string, isSpectator: boolean, sessionId?: string) => {
+    if (!gameId || !mountedRef.current) return;
+
+    const onMessage = (msg: Parameters<typeof handleMessage>[1]) => {
+      handleMessage(key, msg);
+      retriesRef.current.set(key, 0);
     };
     const onClose = () => {
-      setConnected(false);
+      openRef.current.delete(key);
+      updateConnected();
       if (!mountedRef.current) return;
-      const delay = Math.min(1000 * Math.pow(2, retriesRef.current), 30000);
-      retriesRef.current += 1;
+      const retries = retriesRef.current.get(key) ?? 0;
+      const delay = Math.min(1000 * Math.pow(2, retries), 30000);
+      retriesRef.current.set(key, retries + 1);
       setTimeout(() => {
-        if (mountedRef.current) connect();
+        if (mountedRef.current) connectOne(key, isSpectator, sessionId);
       }, delay);
     };
     const onError = () => {
-      setConnected(false);
+      openRef.current.delete(key);
+      updateConnected();
     };
     const onOpen = () => {
-      if (mountedRef.current) setConnected(true);
+      if (mountedRef.current) {
+        openRef.current.add(key);
+        updateConnected();
+      }
     };
 
-    if (spectator) {
-      socketRef.current = connectSpectator(gameId, onMessage, onClose, onError, onOpen);
+    let socket: GameSocket;
+    if (isSpectator) {
+      socket = connectSpectator(gameId, onMessage, onClose, onError, onOpen);
     } else {
-      socketRef.current = connectGame(gameId, sessionId!, onMessage, onClose, onError, onOpen);
+      socket = connectGame(gameId, sessionId!, onMessage, onClose, onError, onOpen);
     }
-  }, [gameId, sessionId, spectator, handleMessage, setConnected]);
+    socketsRef.current.set(key, socket);
+  }, [gameId, handleMessage, updateConnected]);
 
   useEffect(() => {
     mountedRef.current = true;
-    retriesRef.current = 0;
-    connect();
+    retriesRef.current.clear();
+    openRef.current.clear();
+
+    if (spectator) {
+      connectOne('spectator', true);
+    } else {
+      for (const { sessionId } of sessions) {
+        connectOne(sessionId, false, sessionId);
+      }
+    }
 
     return () => {
       mountedRef.current = false;
-      socketRef.current?.close();
-      socketRef.current = null;
+      for (const socket of socketsRef.current.values()) {
+        socket.close();
+      }
+      socketsRef.current.clear();
+      openRef.current.clear();
+      setConnected(false);
     };
-  }, [connect]);
+    // Re-connect when gameId or session list changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, spectator, sessions.map((s) => s.sessionId).join(',')]);
 
   const send = useCallback((msg: ClientMessage) => {
-    socketRef.current?.send(msg);
+    // In hotseat mode, send through the active session's socket
+    const activeSessionId = useGameStore.getState().activeSessionId;
+    if (activeSessionId) {
+      socketsRef.current.get(activeSessionId)?.send(msg);
+    } else {
+      // Fallback: send through the first (or only) socket
+      const first = socketsRef.current.values().next().value;
+      first?.send(msg);
+    }
   }, []);
 
   const connected = useGameStore((s) => s.connected);

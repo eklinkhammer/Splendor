@@ -25,6 +25,7 @@ export function GamePage() {
   const location = useLocation();
   const isSpectator = location.pathname.endsWith('/spectate');
   const sessionId = useSessionStore((s) => s.sessionId);
+  const localSessions = useSessionStore((s) => s.localSessions);
   const gameView = useGameStore((s) => s.gameView);
   const gameResult = useGameStore((s) => s.gameResult);
   const selfPlayerId = useGameStore((s) => s.selfPlayerId);
@@ -44,7 +45,7 @@ export function GamePage() {
   useEffect(() => {
     if (id && sessionId && !gameView && !isSpectator) {
       getGame(id, sessionId).then((view) => {
-        useGameStore.getState().handleServerMessage({
+        useGameStore.getState().handleServerMessage(sessionId, {
           tag: 'GameStateUpdate',
           contents: view,
         });
@@ -54,7 +55,15 @@ export function GamePage() {
     }
   }, [id, sessionId, gameView, isSpectator]);
 
-  const { send } = useGameSocket(id ?? null, isSpectator ? null : sessionId, isSpectator);
+  // Build sessions list for WebSocket connections
+  const allSessions = useMemo(() => {
+    if (isSpectator || !sessionId) return [];
+    const primary = [{ sessionId }];
+    return [...primary, ...localSessions.map((s) => ({ sessionId: s.sessionId }))];
+  }, [isSpectator, sessionId, localSessions]);
+
+  const isHotseat = localSessions.length > 0;
+  const { send } = useGameSocket(id ?? null, allSessions, isSpectator);
 
   const {
     selectedCardId,
@@ -243,7 +252,7 @@ export function GamePage() {
         <ErrorBanner />
 
         <div className="mb-2 sm:mb-3">
-          <GameStatus gameView={gameView} selfPlayerId={isSpectator ? null : selfPlayerId} />
+          <GameStatus gameView={gameView} selfPlayerId={isSpectator ? null : selfPlayerId} isHotseat={isHotseat} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
