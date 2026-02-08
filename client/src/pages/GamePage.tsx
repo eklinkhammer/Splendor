@@ -1,13 +1,16 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useSessionStore } from '../stores/sessionStore';
 import { useGameStore } from '../stores/gameStore';
 import { getGame } from '../services/api';
+import { toDisplayEntries } from '../types';
 import { GameBoard } from '../components/game-board/GameBoard';
 import { GameStatus } from '../components/game-board/GameStatus';
 import { PlayerArea } from '../components/player-area/PlayerArea';
 import { ActionPanel, useActionCallbacks } from '../components/action-panel/ActionPanel';
+import { CardActionOverlay } from '../components/game-board/CardActionOverlay';
+import { GemToken } from '../components/game-board/GemToken';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { GameOverOverlay } from '../components/game-board/GameOverOverlay';
 import { MoveLog } from '../components/game-board/MoveLog';
@@ -49,13 +52,63 @@ export function GamePage() {
 
   const {
     selectedCardId,
-    setSelectedCardId,
+    selectedDeckTier,
+    clearSelection,
     highlightCards,
+    reservableDeckTiers,
     onCardClick,
     onDeckClick,
+    selectedBuyAction,
+    selectedReserveAction,
+    handleBuy,
+    handleReserve,
+    handleDeckReserve,
   } = useActionCallbacks(send);
 
-  const clearSelection = useCallback(() => setSelectedCardId(null), [setSelectedCardId]);
+  // Build the card action overlay for the currently selected card
+  const selectedCardOverlay = useMemo(() => {
+    if (!selectedCardId || (!selectedBuyAction && !selectedReserveAction)) return null;
+
+    // Build payment breakdown for buy actions
+    let paymentBreakdown: React.ReactNode = null;
+    if (selectedBuyAction && selectedBuyAction.tag === 'BuyCard' && gameView) {
+      const payment = selectedBuyAction.contents[1];
+      const paymentEntries = toDisplayEntries(payment);
+      if (paymentEntries.length > 0) {
+        paymentBreakdown = (
+          <div className="w-full space-y-0.5">
+            <div className="flex items-center justify-center gap-1">
+              <div className="flex gap-0.5">
+                {paymentEntries.map(([token, count]) => (
+                  <GemToken key={token} token={token} count={count} size="sm" />
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    return (
+      <CardActionOverlay
+        onBuy={selectedBuyAction ? handleBuy : undefined}
+        onReserve={selectedReserveAction ? handleReserve : undefined}
+        onCancel={clearSelection}
+        paymentBreakdown={paymentBreakdown}
+      />
+    );
+  }, [selectedCardId, selectedBuyAction, selectedReserveAction, handleBuy, handleReserve, clearSelection, gameView, selfPlayerId]);
+
+  // Build the deck action overlay for the currently selected deck
+  const selectedDeckOverlay = useMemo(() => {
+    if (!selectedDeckTier) return null;
+    return (
+      <CardActionOverlay
+        onReserve={handleDeckReserve}
+        onCancel={clearSelection}
+      />
+    );
+  }, [selectedDeckTier, handleDeckReserve, clearSelection]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -103,14 +156,16 @@ export function GamePage() {
               onDeckClick={onDeckClick}
               highlightCards={highlightCards}
               selectedCardId={selectedCardId}
+              selectedCardOverlay={selectedCardOverlay}
+              selectedDeckTier={selectedDeckTier}
+              selectedDeckOverlay={selectedDeckOverlay}
+              reservableDeckTiers={reservableDeckTiers}
             />
             <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
               <ActionPanel
                 gameView={gameView}
                 selfPlayerId={selfPlayerId}
                 send={send}
-                selectedCardId={selectedCardId}
-                onClearSelection={clearSelection}
               />
             </div>
           </div>
@@ -122,6 +177,7 @@ export function GamePage() {
               currentPlayerIndex={gameView.pgvCurrentPlayer}
               onReservedCardClick={onCardClick}
               selectedCardId={selectedCardId}
+              selectedCardOverlay={selectedCardOverlay}
             />
             <div className="mt-3">
               <MoveLog />

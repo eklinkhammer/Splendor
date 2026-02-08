@@ -336,7 +336,7 @@ describe('gameStore', () => {
 
       const log = useGameStore.getState().moveLog;
       expect(log).toHaveLength(1);
-      expect(log[0].description).toBe('Took gems: Diamond, Sapphire, Ruby');
+      expect(log[0]!.description).toBe('Took gems: Diamond, Sapphire, Ruby');
     });
 
     it('does not add entry for same-turn GSU', () => {

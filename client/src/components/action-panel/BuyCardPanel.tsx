@@ -3,7 +3,7 @@ import { countBonuses, toDisplayEntries, computeDiscountTotal } from '../../type
 import { CardDisplay } from '../game-board/CardDisplay';
 import { GemToken } from '../game-board/GemToken';
 
-function PaymentBreakdown({
+export function PaymentBreakdown({
   payment,
   card,
   gameView,

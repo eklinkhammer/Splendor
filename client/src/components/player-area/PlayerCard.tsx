@@ -25,10 +25,11 @@ interface Props {
   isActive: boolean;
   onReservedCardClick?: (cardId: string) => void;
   selectedCardId?: CardId | null;
+  selectedCardOverlay?: React.ReactNode;
   lastMoveText?: string;
 }
 
-export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, selectedCardId, lastMoveText }: Props) {
+export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, selectedCardId, selectedCardOverlay, lastMoveText }: Props) {
   const bonuses = countBonuses(player.ppPurchased);
   const hasTokens = ALL_TOKEN_TYPES.some((t) => (player.ppTokens[t] ?? 0) > 0);
   const hasBonuses = ALL_GEM_COLORS.some((c) => (bonuses[c] ?? 0) > 0);
@@ -126,14 +127,19 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, sele
               </span>
             </div>
             <div className="flex gap-1.5">
-              {player.ppReserved.map((card) => (
-                <CardDisplay
-                  key={card.cardId}
-                  card={card}
-                  onClick={onReservedCardClick ? () => onReservedCardClick(card.cardId) : undefined}
-                  selected={card.cardId === selectedCardId}
-                />
-              ))}
+              {player.ppReserved.map((card) => {
+                const isSelected = card.cardId === selectedCardId;
+                return (
+                  <div key={card.cardId} className={`relative ${isSelected ? 'overflow-visible' : ''}`}>
+                    <CardDisplay
+                      card={card}
+                      onClick={onReservedCardClick ? () => onReservedCardClick(card.cardId) : undefined}
+                      selected={isSelected}
+                    />
+                    {isSelected && selectedCardOverlay}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { PublicTierRow, Tier, CardId } from '../../types';
 import { CardDisplay } from './CardDisplay';
 
@@ -26,9 +27,13 @@ interface Props {
   onDeckClick?: () => void;
   highlightCards?: CardId[];
   selectedCardId?: CardId | null;
+  selectedCardOverlay?: ReactNode;
+  isDeckSelected?: boolean;
+  selectedDeckOverlay?: ReactNode;
+  isDeckReservable?: boolean;
 }
 
-export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [], selectedCardId }: Props) {
+export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = [], selectedCardId, selectedCardOverlay, isDeckSelected, selectedDeckOverlay, isDeckReservable }: Props) {
   return (
     <div className="flex items-center gap-2">
       {/* Tier label */}
@@ -37,30 +42,39 @@ export function TierRow({ tier, row, onCardClick, onDeckClick, highlightCards = 
       </div>
 
       {/* Deck */}
-      <button
-        type="button"
-        onClick={onDeckClick}
-        disabled={!onDeckClick || row.publicDeckCount === 0}
-        className={`w-28 h-[var(--card-height)] rounded-lg border-2 flex flex-col items-center justify-center
-          bg-gradient-to-br ${TIER_DECK_STYLES[tier]} shadow-md
-          ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:shadow-lg hover:brightness-110 transition-all' : 'cursor-default opacity-60'}`}
-      >
-        <span className="text-3xl font-bold text-white/90 drop-shadow-sm">{row.publicDeckCount}</span>
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${TIER_BADGE_STYLES[tier]}`}>
-          {tier.replace('Tier', 'Tier ')}
-        </span>
-      </button>
+      <div className={`relative ${isDeckSelected ? 'overflow-visible' : ''}`}>
+        <button
+          type="button"
+          onClick={onDeckClick}
+          disabled={!onDeckClick || row.publicDeckCount === 0}
+          className={`w-28 h-[var(--card-height)] rounded-lg border-2 flex flex-col items-center justify-center
+            bg-gradient-to-br ${TIER_DECK_STYLES[tier]} shadow-md
+            ${isDeckSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 scale-105 border-amber-400 shadow-lg shadow-amber-300/50' : isDeckReservable ? 'border-amber-400 shadow-lg shadow-amber-300/50' : ''}
+            ${onDeckClick && row.publicDeckCount > 0 ? 'cursor-pointer hover:shadow-lg hover:brightness-110 transition-all' : 'cursor-default opacity-60'}`}
+        >
+          <span className="text-3xl font-bold text-white/90 drop-shadow-sm">{row.publicDeckCount}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mt-1 ${TIER_BADGE_STYLES[tier]}`}>
+            {tier.replace('Tier', 'Tier ')}
+          </span>
+        </button>
+        {isDeckSelected && selectedDeckOverlay}
+      </div>
 
       {/* Display cards */}
-      {row.publicDisplay.map((card) => (
-        <CardDisplay
-          key={card.cardId}
-          card={card}
-          onClick={onCardClick ? () => onCardClick(card.cardId) : undefined}
-          highlight={highlightCards.includes(card.cardId)}
-          selected={card.cardId === selectedCardId}
-        />
-      ))}
+      {row.publicDisplay.map((card) => {
+        const isSelected = card.cardId === selectedCardId;
+        return (
+          <div key={card.cardId} className={`relative ${isSelected ? 'overflow-visible' : ''}`}>
+            <CardDisplay
+              card={card}
+              onClick={onCardClick ? () => onCardClick(card.cardId) : undefined}
+              highlight={highlightCards.includes(card.cardId)}
+              selected={isSelected}
+            />
+            {isSelected && selectedCardOverlay}
+          </div>
+        );
+      })}
 
       {/* Empty slots */}
       {Array.from({ length: Math.max(0, 4 - row.publicDisplay.length) }).map((_, i) => (

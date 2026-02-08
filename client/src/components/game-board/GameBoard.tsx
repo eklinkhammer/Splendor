@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { PublicBoard, CardId, Tier } from '../../types';
 import { NobleRow } from './NobleRow';
 import { TierRow } from './TierRow';
@@ -9,6 +10,10 @@ interface Props {
   onDeckClick?: (tier: Tier) => void;
   highlightCards?: CardId[];
   selectedCardId?: CardId | null;
+  selectedCardOverlay?: ReactNode;
+  selectedDeckTier?: Tier | null;
+  selectedDeckOverlay?: ReactNode;
+  reservableDeckTiers?: Set<Tier>;
 }
 
 export function GameBoard({
@@ -17,6 +22,10 @@ export function GameBoard({
   onDeckClick,
   highlightCards,
   selectedCardId,
+  selectedCardOverlay,
+  selectedDeckTier,
+  selectedDeckOverlay,
+  reservableDeckTiers,
 }: Props) {
   return (
     <div className="bg-[var(--board-felt)] rounded-xl p-6 shadow-inner space-y-4">
@@ -35,6 +44,10 @@ export function GameBoard({
           onDeckClick={onDeckClick ? () => onDeckClick('Tier3') : undefined}
           highlightCards={highlightCards}
           selectedCardId={selectedCardId}
+          selectedCardOverlay={selectedCardOverlay}
+          isDeckSelected={selectedDeckTier === 'Tier3'}
+          selectedDeckOverlay={selectedDeckOverlay}
+          isDeckReservable={reservableDeckTiers?.has('Tier3')}
         />
         <TierRow
           tier="Tier2"
@@ -43,6 +56,10 @@ export function GameBoard({
           onDeckClick={onDeckClick ? () => onDeckClick('Tier2') : undefined}
           highlightCards={highlightCards}
           selectedCardId={selectedCardId}
+          selectedCardOverlay={selectedCardOverlay}
+          isDeckSelected={selectedDeckTier === 'Tier2'}
+          selectedDeckOverlay={selectedDeckOverlay}
+          isDeckReservable={reservableDeckTiers?.has('Tier2')}
         />
         <TierRow
           tier="Tier1"
@@ -51,6 +68,10 @@ export function GameBoard({
           onDeckClick={onDeckClick ? () => onDeckClick('Tier1') : undefined}
           highlightCards={highlightCards}
           selectedCardId={selectedCardId}
+          selectedCardOverlay={selectedCardOverlay}
+          isDeckSelected={selectedDeckTier === 'Tier1'}
+          selectedDeckOverlay={selectedDeckOverlay}
+          isDeckReservable={reservableDeckTiers?.has('Tier1')}
         />
       </div>
 
