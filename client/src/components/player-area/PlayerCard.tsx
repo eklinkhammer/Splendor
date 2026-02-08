@@ -36,7 +36,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, sele
 
   return (
     <div className={`rounded-xl shadow-md transition-all duration-200
-      ${selectedCardId ? 'overflow-visible' : 'overflow-hidden'}
+      ${selectedCardOverlay ? 'overflow-visible' : 'overflow-hidden'}
       ${isActive ? 'ring-2 ring-green-400 shadow-green-500/20' : 'ring-1 ring-gray-600'}`}
     >
       {/* Header bar */}
