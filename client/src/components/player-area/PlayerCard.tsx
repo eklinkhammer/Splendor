@@ -35,11 +35,12 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, sele
   const hasBonuses = ALL_GEM_COLORS.some((c) => (bonuses[c] ?? 0) > 0);
 
   return (
-    <div className={`rounded-xl overflow-hidden shadow-md transition-all duration-200
+    <div className={`rounded-xl shadow-md transition-all duration-200
+      ${selectedCardId ? 'overflow-visible' : 'overflow-hidden'}
       ${isActive ? 'ring-2 ring-green-400 shadow-green-500/20' : 'ring-1 ring-gray-600'}`}
     >
       {/* Header bar */}
-      <div className={`px-4 py-2.5 flex items-center justify-between
+      <div className={`px-4 py-2.5 flex items-center justify-between rounded-t-xl overflow-hidden
         ${isActive ? 'bg-gradient-to-r from-green-600 to-green-700 text-white' : 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100'}`}
       >
         <div className="flex items-center gap-2">
@@ -61,7 +62,7 @@ export function PlayerCard({ player, isSelf, isActive, onReservedCardClick, sele
       </div>
 
       {/* Body */}
-      <div className={`p-3 space-y-2.5 ${isActive ? 'bg-green-900/30' : 'bg-gray-800'}`}>
+      <div className={`p-3 space-y-2.5 rounded-b-xl ${isActive ? 'bg-green-900/30' : 'bg-gray-800'}`}>
         {/* Tokens */}
         {hasTokens && (
           <div>
