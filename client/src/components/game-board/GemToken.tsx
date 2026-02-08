@@ -13,14 +13,13 @@ interface Props {
   token: TokenType;
   count: number;
   onClick?: () => void;
-  selected?: boolean;
   selectedCount?: number;
   size?: 'sm' | 'md';
 }
 
-export function GemToken({ token, count, onClick, selected, selectedCount, size = 'md' }: Props) {
+export function GemToken({ token, count, onClick, selectedCount, size = 'md' }: Props) {
   const sizeClass = size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-base';
-  const effectiveCount = selectedCount ?? (selected ? 1 : 0);
+  const effectiveCount = selectedCount ?? 0;
   const selectionClass =
     effectiveCount >= 2
       ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-gray-900 outline outline-2 outline-offset-[6px] outline-amber-400'

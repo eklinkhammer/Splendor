@@ -218,6 +218,8 @@ export function useActionCallbacks(
           return [color];
         }
 
+        if (current.length >= 3) return current;
+
         return [...current, color];
       });
     },
