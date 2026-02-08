@@ -147,11 +147,12 @@ export function GamePage() {
     );
   }, [isSpectator, selectedDeckTier, handleDeckReserve, clearSelection]);
 
-  // Cleanup on unmount — only reset game state, don't wipe session IDs
-  // (session IDs are cleared explicitly via clearSession in "Return to Lobby")
+  // Cleanup on unmount — reset game state and clear stale session IDs
   useEffect(() => {
     return () => {
       reset();
+      useSessionStore.getState().setGameId(null);
+      useSessionStore.getState().setLobbyId(null);
     };
   }, [reset]);
 

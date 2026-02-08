@@ -29,10 +29,8 @@ interface GameState {
   error: string | null;
   connected: boolean;
   selfPlayerId: PlayerId | null;
-  isSpectator: boolean;
 
   setConnected: (connected: boolean) => void;
-  setSpectator: (spectator: boolean) => void;
   handleServerMessage: (msg: ServerMessage) => void;
   clearError: () => void;
   reset: () => void;
@@ -51,10 +49,8 @@ export const useGameStore = create<GameState>()((set, get) => ({
   error: null,
   connected: false,
   selfPlayerId: null,
-  isSpectator: false,
 
   setConnected: (connected) => set({ connected }),
-  setSpectator: (spectator) => set({ isSpectator: spectator }),
 
   handleServerMessage: (msg) => {
     switch (msg.tag) {
@@ -141,6 +137,5 @@ export const useGameStore = create<GameState>()((set, get) => ({
       error: null,
       connected: false,
       selfPlayerId: null,
-      isSpectator: false,
     }),
 }));

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { getLobby, startGame, addAI, leaveLobby } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 import type { Lobby } from '../../types';
@@ -123,12 +123,12 @@ export function LobbyDetail({ lobbyId }: Props) {
       </div>
       {error && <p className="text-red-500 text-sm">{error}</p>}
       {lobby.lobbyStatus.tag === 'Started' && (
-        <a
-          href={`/game/${lobby.lobbyStatus.contents}/spectate`}
+        <Link
+          to={`/game/${lobby.lobbyStatus.contents}/spectate`}
           className="block w-full px-4 py-2 bg-indigo-600 text-white text-center rounded hover:bg-indigo-700"
         >
           Spectate Game
-        </a>
+        </Link>
       )}
       {lobby.lobbyStatus.tag === 'Waiting' && (
         <div className="space-y-2">

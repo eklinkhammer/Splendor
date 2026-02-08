@@ -186,8 +186,7 @@ leaveLobbyHandler ss lid sid = do
               then pure (Left "Session not in lobby")
               else if isCreator
                 then do
-                  modifyTVar' (ssLobbies ss) $
-                    Map.adjust (\l -> l { lobbyStatus = Closed }) lid
+                  modifyTVar' (ssLobbies ss) $ Map.delete lid
                   pure (Right ())
                 else do
                   modifyTVar' (ssLobbies ss) $
