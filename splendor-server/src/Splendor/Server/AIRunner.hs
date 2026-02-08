@@ -34,6 +34,9 @@ aiLoop ss gid sid =
     agent :: MCTSAgent
     agent = MCTSAgent { mctsConfig = defaultMCTSConfig { mctsIterations = 200, mctsTimeoutMs = 2000 } }
 
+-- | Signal returned by 'goOnce' to tell the retry loop what to do next.
+data LoopSignal = Continue | Done
+
 -- | Parameterized AI loop for testing: accepts any 'Agent' instance.
 aiLoopWith :: forall a. Agent a => ServerState -> GameId -> SessionId -> a -> IO ()
 aiLoopWith ss gid sid agent = do
@@ -45,9 +48,10 @@ aiLoopWith ss gid sid agent = do
 
     retryLoop :: Int -> IO ()
     retryLoop retries = do
-      result <- try @SomeException go
+      result <- try @SomeException goOnce
       case result of
-        Right () -> pure ()  -- normal exit (game finished)
+        Right Done -> pure ()  -- normal exit (game finished)
+        Right Continue -> retryLoop 0  -- reset retries on success
         Left ex
           | Just (_ :: AsyncException) <- fromException ex ->
               -- Thread killed (e.g. game cleanup) — let it die
@@ -61,18 +65,18 @@ aiLoopWith ss gid sid agent = do
               threadDelay 1000000  -- 1s backoff
               retryLoop (retries + 1)
 
-    go :: IO ()
-    go = do
+    goOnce :: IO LoopSignal
+    goOnce = do
       mAction <- atomically $ checkTurn ss gid sid
       case mAction of
-        AIFinished -> pure ()
+        AIFinished -> pure Done
         AIWait -> do
           threadDelay aiPollIntervalUs
-          go
+          pure Continue
         AINeedAction gs _pid -> do
           let actions = legalActions gs
           case actions of
-            [] -> go  -- no legal actions; wait
+            [] -> pure Continue  -- no legal actions; wait
             (fallback:_) -> do
               result <- try @SomeException (chooseAction agent gs actions)
               action <- case result of
@@ -85,11 +89,11 @@ aiLoopWith ss gid sid agent = do
                 Left err -> logAI $ "processAction rejected: " ++ show err
                 Right () -> pure ()
               threadDelay aiMoveDelayUs
-              go
+              pure Continue
         AINeedGemReturn gs _pid -> do
           let options = legalGemReturns gs
           case options of
-            [] -> go  -- no options; wait
+            [] -> pure Continue  -- no options; wait
             (fallback:_) -> do
               result <- try @SomeException (chooseGemReturn agent gs options)
               ret <- case result of
@@ -102,7 +106,7 @@ aiLoopWith ss gid sid agent = do
                 Left err -> logAI $ "processGemReturn rejected: " ++ show err
                 Right () -> pure ()
               threadDelay aiMoveDelayUs
-              go
+              pure Continue
         AINeedNoble gs _pid nobles -> do
           result <- try @SomeException (chooseNoble agent gs nobles)
           noble <- case result of
@@ -117,7 +121,7 @@ aiLoopWith ss gid sid agent = do
             Left err -> logAI $ "processNobleChoice rejected: " ++ show err
             Right () -> pure ()
           threadDelay aiMoveDelayUs
-          go
+          pure Continue
 
     logAI :: String -> IO ()
     logAI msg = hPutStrLn stderr $ "[AI:" ++ show gid ++ ":" ++ show sid ++ "] " ++ msg

@@ -16,6 +16,29 @@ import Splendor.Server.Types
 
 import Splendor.Server.TestHelpers
 
+-- | An agent that returns an invalid action (empty TakeDifferent) for the first N calls,
+--   causing processAction rejection, then delegates to RandomAgent.
+data BadActionAgent = BadActionAgent
+  { baBadCount :: IORef Int  -- ^ remaining bad actions
+  }
+
+mkBadActionAgent :: Int -> IO BadActionAgent
+mkBadActionAgent n = BadActionAgent <$> newIORef n
+
+instance Agent BadActionAgent where
+  agentName _ = "BadActionAgent"
+
+  chooseAction ba gs actions = do
+    remaining <- readIORef (baBadCount ba)
+    if remaining > 0
+      then do
+        modifyIORef' (baBadCount ba) (subtract 1)
+        pure (TakeGems (TakeDifferent []))  -- always rejected
+      else chooseAction RandomAgent gs actions
+
+  chooseGemReturn _ gs opts = chooseGemReturn RandomAgent gs opts
+  chooseNoble _ gs nobles = chooseNoble RandomAgent gs nobles
+
 -- | An agent that throws for the first N calls, then delegates to RandomAgent.
 data ThrowingAgent = ThrowingAgent
   { taFailCount :: IORef Int  -- ^ remaining failures
@@ -237,7 +260,7 @@ spec = do
       tid1 <- forkIO $ aiLoopWith ss gid s1 throwingAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
       -- Game should still finish despite initial exceptions (fallback action used)
-      finished <- waitForGameEnd ss gid 120
+      finished <- waitForGameEnd ss gid 30
       -- Clean up threads
       killThread tid1
       killThread tid2
@@ -245,12 +268,13 @@ spec = do
 
     it "AI continues after processAction rejection" $ do
       (ss, gid, s1, s2) <- setupAIGame
-      -- Spawn both AI players with RandomAgent
-      tid1 <- forkIO $ aiLoopWith ss gid s1 RandomAgent
+      -- BadActionAgent returns invalid actions for first 3 calls,
+      -- triggering processAction rejections before delegating to RandomAgent
+      badAgent <- mkBadActionAgent 3
+      tid1 <- forkIO $ aiLoopWith ss gid s1 badAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
-      -- The AI loop logs processAction rejections but continues;
-      -- game should still finish normally
-      finished <- waitForGameEnd ss gid 120
+      -- Game should still finish despite initial rejections
+      finished <- waitForGameEnd ss gid 30
       killThread tid1
       killThread tid2
       finished `shouldBe` True
