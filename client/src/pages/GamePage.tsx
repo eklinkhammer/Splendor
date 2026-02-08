@@ -9,7 +9,9 @@ import type { GemColor } from '../types';
 import { GameBoard } from '../components/game-board/GameBoard';
 import { GameStatus } from '../components/game-board/GameStatus';
 import { PlayerArea } from '../components/player-area/PlayerArea';
-import { ActionPanel, useActionCallbacks } from '../components/action-panel/ActionPanel';
+import { useActionCallbacks } from '../components/action-panel/ActionPanel';
+import { GemReturnPanel } from '../components/action-panel/GemReturnPanel';
+import { NobleChoicePanel } from '../components/action-panel/NobleChoicePanel';
 import { CardActionOverlay } from '../components/game-board/CardActionOverlay';
 import { GemToken } from '../components/game-board/GemToken';
 import { ErrorBanner } from '../components/ErrorBanner';
@@ -23,6 +25,8 @@ export function GamePage() {
   const gameView = useGameStore((s) => s.gameView);
   const gameResult = useGameStore((s) => s.gameResult);
   const selfPlayerId = useGameStore((s) => s.selfPlayerId);
+  const gemReturnInfo = useGameStore((s) => s.gemReturnInfo);
+  const nobleChoices = useGameStore((s) => s.nobleChoices);
   const connected = useGameStore((s) => s.connected);
   const reset = useGameStore((s) => s.reset);
   const setGameId = useSessionStore((s) => s.setGameId);
@@ -196,13 +200,20 @@ export function GamePage() {
               availableGemColors={availableGemColors}
               bankTakeAction={bankTakeAction}
             />
-            <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
-              <ActionPanel
-                gameView={gameView}
-                selfPlayerId={selfPlayerId}
-                send={send}
-              />
-            </div>
+            {nobleChoices && nobleChoices.length > 0 ? (
+              <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
+                <NobleChoicePanel nobles={nobleChoices} send={send} />
+              </div>
+            ) : gemReturnInfo ? (
+              <div className="mt-4 bg-gradient-to-b from-gray-800 to-gray-900 rounded-xl p-4 shadow-lg">
+                <GemReturnPanel
+                  amount={gemReturnInfo.amount}
+                  options={gemReturnInfo.options}
+                  playerTokens={gameView.pgvPlayers.find((p) => p.ppPlayerId === selfPlayerId)?.ppTokens ?? {}}
+                  send={send}
+                />
+              </div>
+            ) : null}
           </div>
 
           <div>

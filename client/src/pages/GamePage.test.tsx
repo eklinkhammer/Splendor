@@ -20,9 +20,16 @@ vi.mock('../services/api', () => ({
   getGame: () => new Promise(() => {}),
 }));
 
-// Mock ActionPanel — it uses DOM refs and complex child components
+// Mock sub-panels — avoid complex child component rendering
+vi.mock('../components/action-panel/GemReturnPanel', () => ({
+  GemReturnPanel: () => null,
+}));
+vi.mock('../components/action-panel/NobleChoicePanel', () => ({
+  NobleChoicePanel: () => null,
+}));
+
+// Mock ActionPanel hooks — avoid complex child components
 vi.mock('../components/action-panel/ActionPanel', () => ({
-  ActionPanel: () => null,
   useActionCallbacks: () => ({
     selectedCardId: null,
     selectedDeckTier: null,
