@@ -10,6 +10,9 @@ services:
     environment:
       - SPLENDOR_DB_PATH=/data/splendor.db
       - SPLENDOR_PORT=8080
+    networks:
+      - default
+      - shared_proxy
 
   client:
     build:
@@ -17,6 +20,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - "127.0.0.1:3000:80"
+    networks:
+      - default
+      - shared_proxy
 
 volumes:
   splendor-data:
+
+networks:
+  shared_proxy:
+    external: true
