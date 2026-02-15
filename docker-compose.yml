@@ -1,20 +1,10 @@
 services:
-  nginx:
-    build:
-      context: ./nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      - client
-      - server
-
   server:
     build:
       context: .
       dockerfile: splendor-server/Dockerfile
+    ports:
+      - "127.0.0.1:8080:8080"
     volumes:
       - splendor-data:/data
     environment:
@@ -25,8 +15,8 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-    depends_on:
-      - server
+    ports:
+      - "127.0.0.1:3000:80"
 
 volumes:
   splendor-data:
