@@ -83,10 +83,11 @@ export const useGameStore = create<GameState>()((set, get) => ({
         const currentTurnPlayerId = view.pgvPlayers[view.pgvCurrentPlayer]?.ppPlayerId;
         const isLocalPlayerTurn = currentTurnPlayerId != null && newLocalPlayerIds.includes(currentTurnPlayerId);
 
-        // Use this view if:
-        // 1. It's this session's player's turn, OR
-        // 2. No game view yet (first load)
-        const useThisView = !state.gameView || (sessionPlayerId === currentTurnPlayerId);
+        // In hotseat mode (multiple local players), only switch view when it's
+        // this session's player's turn. In online mode (single session), always
+        // accept the update.
+        const isHotseat = newLocalPlayerIds.length > 1;
+        const useThisView = !state.gameView || !isHotseat || (sessionPlayerId === currentTurnPlayerId);
 
         const prev = state.previousGameView;
         let newMoveLog = state.moveLog;
