@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useSessionStore } from '../stores/sessionStore';
@@ -178,6 +178,21 @@ export function GamePage() {
     };
   }, [reset]);
 
+  // Escape key dismisses gem return confirmation modal
+  const handleModalKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') cancelPendingAction();
+  }, [cancelPendingAction]);
+
+  useEffect(() => {
+    if (!pendingAction) return;
+    document.addEventListener('keydown', handleModalKeyDown);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleModalKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [pendingAction, handleModalKeyDown]);
+
   const [mobileTab, setMobileTab] = useState<'players' | 'log' | 'chat'>('players');
   const [sidebarTab, setSidebarTab] = useState<'moves' | 'chat'>('moves');
   const chatMessages = useGameStore((s) => s.chatMessages);
@@ -309,8 +324,8 @@ export function GamePage() {
 
         {/* Gem return confirmation modal */}
         {!isSpectator && pendingAction && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-5 shadow-2xl text-center max-w-[calc(100vw-2rem)] sm:max-w-sm border border-amber-500/30">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={cancelPendingAction}>
+            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-5 shadow-2xl text-center max-w-[calc(100vw-2rem)] sm:max-w-sm border border-amber-500/30" onClick={(e) => e.stopPropagation()}>
               <p className="text-amber-200 text-sm mb-4">
                 You'll need to return {excessGems} gem{excessGems !== 1 ? 's' : ''}. Continue?
               </p>
