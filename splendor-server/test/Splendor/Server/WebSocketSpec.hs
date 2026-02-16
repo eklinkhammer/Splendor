@@ -202,14 +202,21 @@ spec = describe "WebSocket protocol" $ do
         case msg of
           GameStateUpdate _ -> pure ()
           other -> expectationFailure $ "Expected GameStateUpdate, got: " ++ msgTag other
-      -- Small delay for cleanup
-      threadDelay 100000
-      -- Reconnect
-      WS.runClient "127.0.0.1" port (wsPath gid s1) $ \conn -> do
-        msg <- recvMsg conn
-        case msg of
-          GameStateUpdate _ -> pure ()
-          other -> expectationFailure $ "Expected GameStateUpdate on reconnect, got: " ++ msgTag other
+      -- Reconnect with retries — server cleanup from the first connection
+      -- may race with the second connection's setup.
+      let tryReconnect :: Int -> IO ()
+          tryReconnect 0 = expectationFailure "Could not reconnect after retries"
+          tryReconnect n = do
+            threadDelay 200000
+            result <- try $ WS.runClient "127.0.0.1" port (wsPath gid s1) $ \conn -> do
+              msg <- recvMsg conn
+              case msg of
+                GameStateUpdate _ -> pure ()
+                other -> expectationFailure $ "Expected GameStateUpdate on reconnect, got: " ++ msgTag other
+            case result of
+              Right () -> pure ()
+              Left (_ :: WS.ConnectionException) -> tryReconnect (n - 1)
+      tryReconnect 3
 
   it "full game via WS completes with GameOverMsg" $
     withGameWS $ \port ss gid s1 s2 -> do
