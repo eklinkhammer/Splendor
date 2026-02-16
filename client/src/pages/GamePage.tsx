@@ -71,7 +71,7 @@ export function GamePage() {
     [gameView, selfPlayerId],
   );
   const playerTokens: GemCollection = selfPlayer?.ppTokens ?? {};
-  const bankGold = gameView ? (gameView.pgvBoard.publicBank['Gold'] ?? 0) : 0;
+  const bank: GemCollection = gameView?.pgvBoard.publicBank ?? {};
 
   const {
     selectedCardId,
@@ -95,7 +95,7 @@ export function GamePage() {
     excessGems,
     confirmPendingAction,
     cancelPendingAction,
-  } = useActionCallbacks(send, playerTokens, bankGold);
+  } = useActionCallbacks(send, playerTokens, bank);
 
   // Build selectedGemCounts map from selectedBankGems array
   const selectedGemCounts = useMemo(() => {

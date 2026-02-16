@@ -7,7 +7,7 @@ import { totalGems, willRequireGemReturn } from '../../types';
 export function useActionCallbacks(
   send: (msg: ClientMessage) => void,
   playerTokens: GemCollection,
-  bankGold: number,
+  bank: GemCollection,
 ) {
   const legalActions = useGameStore((s) => s.legalActions);
   const [selectedCardId, setSelectedCardId] = useState<CardId | null>(null);
@@ -128,15 +128,17 @@ export function useActionCallbacks(
 
   const computeGemsGained = useCallback((action: Action): number => {
     if (action.tag === 'TakeGems') {
-      return action.contents.tag === 'TakeTwoSame'
-        ? 2
-        : action.contents.contents.length;
+      if (action.contents.tag === 'TakeTwoSame') {
+        const available = bank[action.contents.contents] ?? 0;
+        return Math.min(2, available);
+      }
+      return action.contents.contents.length;
     }
     if (action.tag === 'ReserveCard') {
-      return bankGold > 0 ? 1 : 0;
+      return (bank['Gold'] ?? 0) > 0 ? 1 : 0;
     }
     return 0;
-  }, [bankGold]);
+  }, [bank]);
 
   const excessGems = useMemo(() => {
     if (!pendingAction) return 0;
