@@ -6,7 +6,37 @@ on:
       - master
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GHC
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6'
+          cabal-version: 'latest'
+
+      - name: Cache cabal store
+        uses: actions/cache@v4
+        with:
+          path: ~/.cabal/store
+          key: cabal-${{ runner.os }}-ghc9.6-${{ hashFiles('cabal.project', '**/*.cabal') }}
+          restore-keys: |
+            cabal-${{ runner.os }}-ghc9.6-
+
+      - name: Update package index
+        run: cabal update
+
+      - name: Build all packages
+        run: cabal build all
+
+      - name: Run all tests
+        run: cabal test all
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
