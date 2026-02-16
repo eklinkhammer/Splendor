@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CreateLobbyForm } from '../components/lobby/CreateLobbyForm';
 import { LobbyList } from '../components/lobby/LobbyList';
 import { LobbyDetail } from '../components/lobby/LobbyDetail';
@@ -10,17 +9,8 @@ import type { Lobby } from '../types';
 export function HomePage() {
   const [activeLobbyId, setActiveLobbyId] = useState<string | null>(null);
   const [joiningLobby, setJoiningLobby] = useState<Lobby | null>(null);
-  const navigate = useNavigate();
   const sessionId = useSessionStore((s) => s.sessionId);
   const lobbyId = useSessionStore((s) => s.lobbyId);
-  const gameId = useSessionStore((s) => s.gameId);
-
-  // Redirect to active game if we have one
-  useEffect(() => {
-    if (gameId && sessionId) {
-      navigate(`/game/${gameId}`);
-    }
-  }, [gameId, sessionId, navigate]);
 
   // Restore active lobby from session
   useEffect(() => {
