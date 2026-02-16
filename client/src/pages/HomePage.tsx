@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { CreateLobbyForm } from '../components/lobby/CreateLobbyForm';
 import { LobbyList } from '../components/lobby/LobbyList';
 import { LobbyDetail } from '../components/lobby/LobbyDetail';
@@ -9,15 +9,12 @@ import type { Lobby } from '../types';
 export function HomePage() {
   const [activeLobbyId, setActiveLobbyId] = useState<string | null>(null);
   const [joiningLobby, setJoiningLobby] = useState<Lobby | null>(null);
-  const sessionId = useSessionStore((s) => s.sessionId);
-  const lobbyId = useSessionStore((s) => s.lobbyId);
+  const setLobbyId = useSessionStore((s) => s.setLobbyId);
 
-  // Restore active lobby from session
+  // Always start fresh — clear any stale lobbyId from a previous session
   useEffect(() => {
-    if (lobbyId && sessionId && !activeLobbyId) {
-      setActiveLobbyId(lobbyId);
-    }
-  }, [lobbyId, sessionId, activeLobbyId]);
+    setLobbyId(null);
+  }, [setLobbyId]);
 
   return (
     <div className="min-h-screen bg-gray-900">
