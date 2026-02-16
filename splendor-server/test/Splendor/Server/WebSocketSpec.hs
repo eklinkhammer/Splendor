@@ -54,6 +54,17 @@ connectWithRetry host port path action = go (3 :: Int)
 wsPath :: GameId -> SessionId -> String
 wsPath gid sid = "/api/v1/games/" <> T.unpack gid <> "/ws?session=" <> T.unpack sid
 
+-- | Retry an action up to @n@ extra times on ConnectionException (transient CI race).
+retryOnConnectionClosed :: Int -> IO a -> IO a
+retryOnConnectionClosed 0 action = action
+retryOnConnectionClosed n action = do
+  result <- try action
+  case result of
+    Right a -> pure a
+    Left (_ :: WS.ConnectionException) -> do
+      threadDelay 100000  -- 100ms
+      retryOnConnectionClosed (n - 1) action
+
 spec :: Spec
 spec = describe "WebSocket protocol" $ do
 
@@ -79,7 +90,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected ActionRequired, got: " ++ msgTag other
 
   it "non-current player receives only GameStateUpdate" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
       nonCurSid <- wrongSession ss gid s1 s2
       connectWithRetry "127.0.0.1" port (wsPath gid nonCurSid) $ \conn -> do
         msg1 <- recvMsg conn
@@ -105,7 +116,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected Pong, got: " ++ msgTag other
 
   it "valid TakeGems action triggers GameStateUpdate broadcast" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
       curSid <- currentSession ss gid s1 s2
       let otherSid = if curSid == s1 then s2 else s1
       connectWithRetry "127.0.0.1" port (wsPath gid curSid) $ \conn1 ->
@@ -135,7 +146,7 @@ spec = describe "WebSocket protocol" $ do
             other -> expectationFailure $ "P2 expected GameStateUpdate, got: " ++ msgTag other
 
   it "action from wrong player returns ErrorMsg" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
       nonCurSid <- wrongSession ss gid s1 s2
       connectWithRetry "127.0.0.1" port (wsPath gid nonCurSid) $ \conn -> do
         _ <- recvMsg conn  -- GameStateUpdate
@@ -149,7 +160,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected ErrorMsg, got: " ++ msgTag other
 
   it "malformed JSON returns ErrorMsg" $
-    withGameWS $ \port _ss gid s1 _s2 ->
+    withGameWS $ \port _ss gid s1 _s2 -> retryOnConnectionClosed 2 $
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn -> do
         _ <- recvMsg conn  -- GameStateUpdate
         _ <- timeout 500000 (recvMsg conn)

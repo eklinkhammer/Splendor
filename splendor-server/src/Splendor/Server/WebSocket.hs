@@ -4,6 +4,7 @@ module Splendor.Server.WebSocket
   ) where
 
 import Control.Concurrent (forkIO, killThread)
+import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM
 import Control.Exception (finally)
 import Data.Aeson (decode, encode)
@@ -38,8 +39,12 @@ handleWebSocket ss gameId sessionId conn = do
           chan <- atomically $ registerConnection gameTVar sessionId
           -- Send initial state
           sendInitialState conn gameTVar ps
-          -- Fork sender thread
-          senderId <- forkIO $ senderLoop conn chan
+          -- Fork sender thread and wait for it to start
+          started <- newEmptyMVar
+          senderId <- forkIO $ do
+            putMVar started ()
+            senderLoop conn chan
+          takeMVar started
           -- Run receiver loop, clean up on exit
           finally
             (receiverLoop ss conn gameId sessionId)
@@ -130,8 +135,12 @@ handleSpectatorWebSocket gameTVar specId conn = do
   mg <- atomically $ readTVar gameTVar
   let view = toSpectatorGameView (mgGameState mg)
   WS.sendTextData conn (encode (GameStateUpdate view))
-  -- Fork sender
-  senderId <- forkIO $ senderLoop conn chan
+  -- Fork sender and wait for it to start
+  started <- newEmptyMVar
+  senderId <- forkIO $ do
+    putMVar started ()
+    senderLoop conn chan
+  takeMVar started
   -- Receiver: only accept Ping, reject everything else
   finally
     (spectatorReceiverLoop conn)
