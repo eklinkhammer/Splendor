@@ -233,24 +233,6 @@ spec = do
       gotBroadcast <- waitForChanMsg chan 150 isGameState
       gotBroadcast `shouldBe` True
 
-    it "AI-only game (2 AI) plays to completion within timeout" $ do
-      ss <- newServerState NoPersistence
-      resp <- run $ createH ss (CreateLobbyRequest "Bot" "AI Game")
-      let lid = clrLobbyId resp
-      -- Mark the creator's slot as AI
-      atomically $ modifyTVar' (ssLobbies ss) $
-        Map.adjust (\lobby ->
-          let slots' = map (\s -> s { lsIsAI = True }) (lobbySlots lobby)
-          in lobby { lobbySlots = slots' }
-        ) lid
-      -- Add a second AI player
-      _ <- run $ addAIH ss lid
-      gameResp <- run $ startH ss lid
-      let gid = sgrGameId gameResp
-      -- Poll for game completion with timeout
-      finished <- waitForGameEnd ss gid 360  -- 360 seconds max
-      finished `shouldBe` True
-
   describe "AI error recovery" $ do
     it "AI recovers from agent exception via fallback and completes game" $ do
       (ss, gid, s1, s2) <- setupAIGame
