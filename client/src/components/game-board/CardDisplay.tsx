@@ -67,11 +67,11 @@ export function CardDisplay({ card, onClick, highlight, selected }: Props) {
       </div>
 
       {/* Card body with cost */}
-      <div className="flex-1 p-1.5 flex flex-col justify-end">
-        <div className="flex flex-col gap-0.5">
+      <div className="flex-1 p-1 sm:p-1.5 flex flex-col justify-end">
+        <div className="flex flex-col gap-0 sm:gap-0.5">
           {costEntries.map((color) => (
             <div key={color} className="flex items-center gap-1">
-              <div className={`w-4 sm:w-4.5 lg:w-5 h-4 sm:h-4.5 lg:h-5 rounded-full text-[10px] sm:text-xs flex items-center justify-center font-bold shadow-sm ${COST_PILL_COLORS[color]}`}>
+              <div className={`w-3 h-3 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 rounded-full text-[9px] sm:text-xs flex items-center justify-center font-bold shadow-sm ${COST_PILL_COLORS[color]}`}>
                 {card.cardCost[color]}
               </div>
             </div>
