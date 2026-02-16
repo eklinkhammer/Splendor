@@ -298,26 +298,6 @@ export function GamePage() {
                   send={send}
                 />
               </div>
-            ) : !isSpectator && pendingAction ? (
-              <div className="mt-4 bg-gradient-to-b from-amber-900/60 to-amber-950/60 border border-amber-600/40 rounded-xl p-4 shadow-lg">
-                <p className="text-amber-200 text-sm text-center mb-3">
-                  This action will put you over the token limit. You'll need to return {excessGems} gem{excessGems !== 1 ? 's' : ''}. Continue?
-                </p>
-                <div className="flex justify-center gap-3">
-                  <button
-                    onClick={cancelPendingAction}
-                    className="px-5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={confirmPendingAction}
-                    className="px-5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
-                  >
-                    Continue
-                  </button>
-                </div>
-              </div>
             ) : null}
           </div>
 
@@ -326,6 +306,31 @@ export function GamePage() {
             {sidebarContent}
           </div>
         </div>
+
+        {/* Gem return confirmation modal */}
+        {!isSpectator && pendingAction && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl p-5 shadow-2xl text-center max-w-[calc(100vw-2rem)] sm:max-w-sm border border-amber-500/30">
+              <p className="text-amber-200 text-sm mb-4">
+                You'll need to return {excessGems} gem{excessGems !== 1 ? 's' : ''}. Continue?
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={cancelPendingAction}
+                  className="flex-1 px-5 py-2 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmPendingAction}
+                  className="flex-1 px-5 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mobile tabbed sidebar */}
         <div className="lg:hidden mt-4">
