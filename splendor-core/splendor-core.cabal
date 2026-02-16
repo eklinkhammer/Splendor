@@ -72,3 +72,5 @@ test-suite splendor-core-test
     containers,
     text        >= 2.0,
     random      >= 1.2,
+  build-tool-depends:
+    hspec-discover:hspec-discover >= 2.10,

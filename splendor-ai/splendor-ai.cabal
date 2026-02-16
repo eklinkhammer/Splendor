@@ -56,3 +56,5 @@ test-suite splendor-ai-test
     random,
     text        >= 2.0,
     time        >= 1.12,
+  build-tool-depends:
+    hspec-discover:hspec-discover >= 2.10,
