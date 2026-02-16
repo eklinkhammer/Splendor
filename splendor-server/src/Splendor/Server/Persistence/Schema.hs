@@ -2,11 +2,12 @@ module Splendor.Server.Persistence.Schema
   ( initSchema
   ) where
 
+import Control.Exception (SomeException, try)
 import Database.SQLite.Simple (execute_)
 
 import Splendor.Server.Persistence.Handle (PersistenceHandle(..))
 
--- | Create tables if they don't exist.
+-- | Create tables if they don't exist, then run migrations.
 initSchema :: PersistenceHandle -> IO ()
 initSchema NoPersistence = pure ()
 initSchema (PersistenceHandle conn) = do
@@ -17,12 +18,12 @@ initSchema (PersistenceHandle conn) = do
     \  game_state     TEXT NOT NULL, \
     \  sessions       TEXT NOT NULL, \
     \  pending_nobles TEXT, \
+    \  created_at     TEXT NOT NULL DEFAULT (datetime('now')), \
     \  updated_at     TEXT NOT NULL DEFAULT (datetime('now')) \
     \)"
-  execute_ conn
-    "CREATE TABLE IF NOT EXISTS sessions (\
-    \  session_id  TEXT PRIMARY KEY, \
-    \  game_id     TEXT NOT NULL REFERENCES games(game_id), \
-    \  player_name TEXT NOT NULL, \
-    \  is_ai       INTEGER NOT NULL DEFAULT 0 \
-    \)"
+  -- Migrations (no-op if already applied)
+  _ <- try @SomeException $
+    execute_ conn "ALTER TABLE games ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))"
+  _ <- try @SomeException $
+    execute_ conn "DROP TABLE IF EXISTS sessions"
+  pure ()

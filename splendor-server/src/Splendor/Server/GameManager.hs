@@ -19,6 +19,7 @@ import Control.Exception (try, SomeException)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
+import System.IO (hPutStrLn, stderr)
 import System.Random (newStdGen)
 
 import Splendor.Core.Engine
@@ -327,8 +328,12 @@ storeAIThreads ss gid tids = atomically $ do
     Just gameTVar ->
       modifyTVar' gameTVar $ \mg -> mg { mgAIThreads = tids }
 
--- | Persist a managed game to the database (fire-and-forget; ignores errors).
+-- | Persist a managed game to the database (fire-and-forget; logs errors to stderr).
 persistGame :: ServerState -> GameId -> ManagedGame -> IO ()
-persistGame ss gid mg =
-  saveGame (ssPersistence ss) gid (mgGameState mg) (mgStatus mg) (mgSessions mg) (mgPendingNobles mg)
+persistGame ss gid mg = do
+  result <- try @SomeException $
+    saveGame (ssPersistence ss) gid (mgGameState mg) (mgStatus mg) (mgSessions mg) (mgPendingNobles mg)
+  case result of
+    Right () -> pure ()
+    Left ex  -> hPutStrLn stderr $ "persistGame: failed for game " ++ show gid ++ ": " ++ show ex
 

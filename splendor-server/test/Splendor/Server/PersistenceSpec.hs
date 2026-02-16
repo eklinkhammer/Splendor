@@ -43,7 +43,7 @@ spec = do
             :: IO [[String]]
           let tableNames = map (\case [n] -> n; _ -> "") rows
           tableNames `shouldContain` ["games"]
-          tableNames `shouldContain` ["sessions"]
+          tableNames `shouldNotContain` ["sessions"]
         NoPersistence -> expectationFailure "Expected PersistenceHandle"
 
     it "is idempotent — calling twice doesn't error" $ withTempDb $ \ph -> do

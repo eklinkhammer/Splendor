@@ -26,12 +26,10 @@ restoreOne :: ServerState
            -> IO ()
 restoreOne ss (gid, gs, sessions, pendingNobles) = do
   -- Build a ManagedGame with empty connections (players will reconnect via WS)
-  chans <- mapM (\_ -> newTChanIO) (Map.elems sessions)
-  let chanMap = Map.fromList $ zip (Map.keys sessions) chans
-      mg = ManagedGame
+  let mg = ManagedGame
         { mgGameState     = gs
         , mgSessions      = sessions
-        , mgConnections   = chanMap
+        , mgConnections   = Map.empty
         , mgSpectators    = Map.empty
         , mgStatus        = GameActive
         , mgPendingNobles = pendingNobles

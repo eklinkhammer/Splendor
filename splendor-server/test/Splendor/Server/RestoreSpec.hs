@@ -106,7 +106,7 @@ spec = do
         _ -> expectationFailure "Session not found"
 
   describe "connections" $ do
-    it "restored games have fresh channels (keys match sessions, channels are empty)" $ withTempDb $ \ph -> do
+    it "restored games have empty connections (players reconnect via WS)" $ withTempDb $ \ph -> do
       (_ss, gid, _s1, _s2) <- setupGameWithPersistence ph
       ss2 <- newServerState ph
       restoreGames ss2
@@ -115,14 +115,7 @@ spec = do
         Nothing -> expectationFailure "Game not found"
         Just tv -> do
           mg <- readTVarIO tv
-          let connKeys = Map.keys (mgConnections mg)
-              sessKeys = Map.keys (mgSessions mg)
-          connKeys `shouldMatchList` sessKeys
-          -- All channels should be empty
-          mapM_ (\chan -> do
-            mMsg <- atomically $ tryReadTChan chan
-            mMsg `shouldBe` Nothing
-            ) (Map.elems (mgConnections mg))
+          Map.size (mgConnections mg) `shouldBe` 0
 
     it "restored games have empty spectators map" $ withTempDb $ \ph -> do
       (_ss, gid, _, _) <- setupGameWithPersistence ph
