@@ -114,6 +114,19 @@ export function LobbyDetail({ lobbyId }: Props) {
   };
 
   if (!lobby) {
+    if (error) {
+      return (
+        <div className="space-y-3">
+          <p className="text-red-400 text-sm">{error}</p>
+          <button
+            onClick={() => { clearSession(); navigate('/'); }}
+            className="w-full px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            Back to Lobby List
+          </button>
+        </div>
+      );
+    }
     return <p className="text-gray-400">Loading lobby...</p>;
   }
 
