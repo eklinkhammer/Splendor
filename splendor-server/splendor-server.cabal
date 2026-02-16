@@ -76,6 +76,8 @@ test-suite splendor-server-test
     Splendor.Server.TypesSpec
     Splendor.Server.GameManagerSpec
     Splendor.Server.GameplayIntegrationSpec
+    Splendor.Server.PersistenceSpec
+    Splendor.Server.RestoreSpec
     Splendor.Server.API.LobbySpec
     Splendor.Server.API.GameSpec
     Splendor.Server.API.LobbyHTTPSpec
@@ -88,19 +90,23 @@ test-suite splendor-server-test
     splendor-server,
     splendor-core,
     splendor-ai,
-    hspec       >= 2.10,
-    aeson       >= 2.1,
-    containers  >= 0.6,
-    stm         >= 2.5,
+    hspec          >= 2.10,
+    aeson          >= 2.1,
+    containers     >= 0.6,
+    stm            >= 2.5,
     servant-server >= 0.20,
-    text        >= 2.0,
-    time        >= 1.12,
-    random      >= 1.2,
-    wai         >= 3.2,
-    warp        >= 3.3,
-    wai-extra   >= 3.1,
-    websockets  >= 0.13,
-    http-types  >= 0.12,
-    bytestring  >= 0.11,
+    text           >= 2.0,
+    time           >= 1.12,
+    random         >= 1.2,
+    wai            >= 3.2,
+    warp           >= 3.3,
+    wai-extra      >= 3.1,
+    websockets     >= 0.13,
+    http-types     >= 0.12,
+    bytestring     >= 0.11,
+    sqlite-simple  >= 0.4,
+    temporary      >= 1.3,
+    directory      >= 1.3,
+    filepath       >= 1.4,
   build-tool-depends:
     hspec-discover:hspec-discover >= 2.10,

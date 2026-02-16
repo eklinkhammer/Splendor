@@ -2,6 +2,9 @@ module Splendor.Server.TestHelpers
   ( -- * Game setup
     setupGame
   , setupGame3
+  , setupGameWithPersistence
+    -- * Persistence helpers
+  , withTempDb
     -- * Lookups
   , lookupGameTVarOrFail
   , lookupGameOrFail
@@ -35,6 +38,7 @@ module Splendor.Server.TestHelpers
   ) where
 
 import Control.Concurrent.STM
+import Control.Exception (bracket)
 import Data.Aeson (ToJSON, encode)
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as BS
@@ -52,8 +56,13 @@ import Splendor.Core.Types
 import Splendor.Server.API.Game (gameServer)
 import Splendor.Server.API.Lobby (lobbyServer)
 import Splendor.Server.App (mkApp)
+import Splendor.Server.Persistence (initPersistence)
+import Splendor.Server.Persistence.Schema (initSchema)
 import Splendor.Server.Types
 import Splendor.Server.GameManager
+import System.Directory (removeDirectoryRecursive)
+import System.FilePath ((</>))
+import System.IO.Temp (createTempDirectory, getCanonicalTemporaryDirectory)
 
 -- ============================================================
 -- Game setup
@@ -84,6 +93,34 @@ setupGame3 = do
               ]
   gid <- createGame ss slots
   pure (ss, gid, s1, s2, s3)
+
+-- | Create a ServerState with real persistence and a 2-player game.
+setupGameWithPersistence :: PersistenceHandle -> IO (ServerState, GameId, SessionId, SessionId)
+setupGameWithPersistence ph = do
+  ss <- newServerState ph
+  let s1 = "session-1"
+      s2 = "session-2"
+      slots = [ LobbySlot s1 "Alice" False
+              , LobbySlot s2 "Bob" False
+              ]
+  gid <- createGame ss slots
+  pure (ss, gid, s1, s2)
+
+-- | Run an action with a temporary SQLite database. The database file is
+--   created in a temp directory and cleaned up after the callback returns.
+withTempDb :: (PersistenceHandle -> IO a) -> IO a
+withTempDb action =
+  bracket acquire release (\(_, ph) -> action ph)
+  where
+    acquire = do
+      tmpDir <- getCanonicalTemporaryDirectory
+      dir <- createTempDirectory tmpDir "splendor-test"
+      let dbPath = dir </> "test.db"
+      ph <- initPersistence (Just dbPath)
+      initSchema ph
+      pure (dir, ph)
+    release (dir, _) =
+      removeDirectoryRecursive dir
 
 -- ============================================================
 -- Lookups
