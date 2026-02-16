@@ -5,7 +5,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useGameStore } from '../stores/gameStore';
 import { getGame } from '../services/api';
 import { toDisplayEntries } from '../types';
-import type { GemColor } from '../types';
+import type { GemColor, GemCollection } from '../types';
 import { GameBoard } from '../components/game-board/GameBoard';
 import { GameStatus } from '../components/game-board/GameStatus';
 import { PlayerArea } from '../components/player-area/PlayerArea';
@@ -65,6 +65,14 @@ export function GamePage() {
   const isHotseat = localSessions.length > 0;
   const { send } = useGameSocket(id ?? null, allSessions, isSpectator);
 
+  // Derive player tokens and bank gold for gem return prediction
+  const selfPlayer = useMemo(
+    () => gameView?.pgvPlayers.find((p) => p.ppPlayerId === selfPlayerId),
+    [gameView, selfPlayerId],
+  );
+  const playerTokens: GemCollection = selfPlayer?.ppTokens ?? {};
+  const bankGold = gameView ? (gameView.pgvBoard.publicBank['Gold'] ?? 0) : 0;
+
   const {
     selectedCardId,
     selectedDeckTier,
@@ -83,7 +91,11 @@ export function GamePage() {
     matchedTakeAction,
     handleTakeGems,
     availableGemColors,
-  } = useActionCallbacks(send);
+    pendingAction,
+    excessGems,
+    confirmPendingAction,
+    cancelPendingAction,
+  } = useActionCallbacks(send, playerTokens, bankGold);
 
   // Build selectedGemCounts map from selectedBankGems array
   const selectedGemCounts = useMemo(() => {
@@ -282,9 +294,29 @@ export function GamePage() {
                 <GemReturnPanel
                   amount={gemReturnInfo.amount}
                   options={gemReturnInfo.options}
-                  playerTokens={gameView.pgvPlayers.find((p) => p.ppPlayerId === selfPlayerId)?.ppTokens ?? {}}
+                  playerTokens={selfPlayer?.ppTokens ?? {}}
                   send={send}
                 />
+              </div>
+            ) : !isSpectator && pendingAction ? (
+              <div className="mt-4 bg-gradient-to-b from-amber-900/60 to-amber-950/60 border border-amber-600/40 rounded-xl p-4 shadow-lg">
+                <p className="text-amber-200 text-sm text-center mb-3">
+                  This action will put you over the token limit. You'll need to return {excessGems} gem{excessGems !== 1 ? 's' : ''}. Continue?
+                </p>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={cancelPendingAction}
+                    className="px-5 py-1.5 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmPendingAction}
+                    className="px-5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-sm rounded-xl font-semibold shadow-md transition-colors"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>

@@ -1,15 +1,21 @@
 import { useState, useCallback, useMemo } from 'react';
-import type { ClientMessage, CardId, Tier, Action, GemColor } from '../../types';
+import type { ClientMessage, CardId, Tier, Action, GemColor, GemCollection } from '../../types';
 import { useGameStore } from '../../stores/gameStore';
+import { totalGems, willRequireGemReturn } from '../../types';
 
 /** Hook for GamePage to get interactive callbacks for the board */
 export function useActionCallbacks(
   send: (msg: ClientMessage) => void,
+  playerTokens: GemCollection,
+  bankGold: number,
 ) {
   const legalActions = useGameStore((s) => s.legalActions);
   const [selectedCardId, setSelectedCardId] = useState<CardId | null>(null);
   const [selectedDeckTier, setSelectedDeckTier] = useState<Tier | null>(null);
   const [selectedBankGems, setSelectedBankGems] = useState<GemColor[]>([]);
+  const [pendingAction, setPendingAction] = useState<Action | null>(null);
+
+  const currentTokenTotal = useMemo(() => totalGems(playerTokens), [playerTokens]);
 
   // --- Card/deck logic (unchanged) ---
 
@@ -118,6 +124,48 @@ export function useActionCallbacks(
     setSelectedBankGems([]);
   }, []);
 
+  // --- Gem return confirmation logic ---
+
+  const computeGemsGained = useCallback((action: Action): number => {
+    if (action.tag === 'TakeGems') {
+      return action.contents.tag === 'TakeTwoSame'
+        ? 2
+        : action.contents.contents.length;
+    }
+    if (action.tag === 'ReserveCard') {
+      return bankGold > 0 ? 1 : 0;
+    }
+    return 0;
+  }, [bankGold]);
+
+  const excessGems = useMemo(() => {
+    if (!pendingAction) return 0;
+    return willRequireGemReturn(currentTokenTotal, computeGemsGained(pendingAction));
+  }, [pendingAction, currentTokenTotal, computeGemsGained]);
+
+  const confirmPendingAction = useCallback(() => {
+    if (pendingAction) {
+      send({ tag: 'SubmitAction', contents: pendingAction });
+      setPendingAction(null);
+      clearSelection();
+    }
+  }, [pendingAction, send, clearSelection]);
+
+  const cancelPendingAction = useCallback(() => {
+    setPendingAction(null);
+  }, []);
+
+  /** Send action immediately or set as pending if it will trigger gem return */
+  const sendOrConfirm = useCallback((action: Action) => {
+    const excess = willRequireGemReturn(currentTokenTotal, computeGemsGained(action));
+    if (excess > 0) {
+      setPendingAction(action);
+    } else {
+      send({ tag: 'SubmitAction', contents: action });
+      clearSelection();
+    }
+  }, [currentTokenTotal, computeGemsGained, send, clearSelection]);
+
   const onBankGemClick = useCallback(
     (color: GemColor) => {
       // Clear card/deck selection when interacting with gems
@@ -158,10 +206,9 @@ export function useActionCallbacks(
 
   const handleTakeGems = useCallback(() => {
     if (matchedTakeAction) {
-      send({ tag: 'SubmitAction', contents: matchedTakeAction });
-      clearSelection();
+      sendOrConfirm(matchedTakeAction);
     }
-  }, [matchedTakeAction, send, clearSelection]);
+  }, [matchedTakeAction, sendOrConfirm]);
 
   const handleBuy = useCallback(() => {
     if (selectedBuyAction) {
@@ -172,17 +219,15 @@ export function useActionCallbacks(
 
   const handleReserve = useCallback(() => {
     if (selectedReserveAction) {
-      send({ tag: 'SubmitAction', contents: selectedReserveAction });
-      clearSelection();
+      sendOrConfirm(selectedReserveAction);
     }
-  }, [selectedReserveAction, send, clearSelection]);
+  }, [selectedReserveAction, sendOrConfirm]);
 
   const handleDeckReserve = useCallback(() => {
     if (selectedDeckReserveAction) {
-      send({ tag: 'SubmitAction', contents: selectedDeckReserveAction });
-      clearSelection();
+      sendOrConfirm(selectedDeckReserveAction);
     }
-  }, [selectedDeckReserveAction, send, clearSelection]);
+  }, [selectedDeckReserveAction, sendOrConfirm]);
 
   const onCardClick = useCallback(
     (cardId: CardId) => {
@@ -225,6 +270,10 @@ export function useActionCallbacks(
     handleDeckReserve,
     handleTakeGems,
     availableGemColors,
+    pendingAction,
+    excessGems,
+    confirmPendingAction,
+    cancelPendingAction,
   };
 }
 

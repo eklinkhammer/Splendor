@@ -71,6 +71,12 @@ export function computeDiscountTotal(
   }, 0);
 }
 
+/** Predict how many gems must be returned after gaining tokens */
+export function willRequireGemReturn(currentTokenTotal: number, gemsGained: number): number {
+  const excess = currentTokenTotal + gemsGained - 10;
+  return excess > 0 ? excess : 0;
+}
+
 /** Display entries for gem colors only (no gold) */
 export function toGemColorEntries(gc: GemCollection): [GemColor, number][] {
   return ALL_GEM_COLORS
