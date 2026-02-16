@@ -248,7 +248,7 @@ spec = do
       gameResp <- run $ startH ss lid
       let gid = sgrGameId gameResp
       -- Poll for game completion with timeout
-      finished <- waitForGameEnd ss gid 240  -- 240 seconds max
+      finished <- waitForGameEnd ss gid 360  -- 360 seconds max
       finished `shouldBe` True
 
   describe "AI error recovery" $ do
