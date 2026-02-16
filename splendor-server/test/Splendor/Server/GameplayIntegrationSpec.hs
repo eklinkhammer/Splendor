@@ -245,7 +245,7 @@ spec = do
   -- ================================================================
   describe "lobby → game → play lifecycle" $ do
     it "lobby create→join→start→play one turn" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       -- Create and join
       createResp <- run $ createH ss (CreateLobbyRequest "Alice" "Test")
       let lid = clrLobbyId createResp
@@ -261,7 +261,7 @@ spec = do
       result `shouldSatisfy` isRight
 
     it "lobby create→join→start→play to completion" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       createResp <- run $ createH ss (CreateLobbyRequest "Alice" "Test")
       let lid = clrLobbyId createResp
           s1  = clrSessionId createResp
@@ -275,7 +275,7 @@ spec = do
       mgStatus mg `shouldBe` GameFinished
 
     it "lobby start creates valid game state" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       createResp <- run $ createH ss (CreateLobbyRequest "Alice" "Test")
       let lid = clrLobbyId createResp
       _ <- run $ joinH ss lid (JoinLobbyRequest "Bob")

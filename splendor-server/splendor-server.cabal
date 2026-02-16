@@ -32,7 +32,9 @@ library
     Splendor.Server.WebSocket
     Splendor.Server.GameManager
     Splendor.Server.Persistence
+    Splendor.Server.Persistence.Handle
     Splendor.Server.Persistence.Schema
+    Splendor.Server.Restore
     Splendor.Server.Types
   build-depends:
     base            >= 4.17 && < 5,

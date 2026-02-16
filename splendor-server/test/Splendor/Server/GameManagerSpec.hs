@@ -70,7 +70,7 @@ spec = do
       result `shouldBe` Left "Invalid session"
 
     it "game not found returns error" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       result <- processAction ss "no-such-game" "any-session" (TakeGems (TakeDifferent [Ruby]))
       result `shouldBe` Left "Game not found"
 
@@ -445,7 +445,7 @@ spec = do
         Nothing -> expectationFailure "Game not found after create"
 
     it "not found for random id" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       result <- lookupGame ss "random-id"
       case result of
         Nothing -> pure ()
@@ -460,7 +460,7 @@ spec = do
         Nothing -> expectationFailure "Session not found after create"
 
     it "not found for random id" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       result <- lookupSession ss "random-id"
       result `shouldBe` Nothing
 

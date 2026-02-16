@@ -78,7 +78,7 @@ instance Agent ThrowingAgent where
 --   Both sessions are AI-controlled.
 setupAIGame :: IO (ServerState, GameId, SessionId, SessionId)
 setupAIGame = do
-  ss <- newServerState
+  ss <- newServerState NoPersistence
   let s1 = "ai-session-1"
       s2 = "ai-session-2"
       slots = [ LobbySlot s1 "AI-1" True
@@ -91,7 +91,7 @@ spec :: Spec
 spec = do
   describe "add-ai endpoint" $ do
     it "adds AI slot to waiting lobby" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       slot <- run $ addAIH ss lid
@@ -102,7 +102,7 @@ spec = do
       length (lobbySlots lobby) `shouldBe` 2
 
     it "auto-increments AI player names" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       slot1 <- run $ addAIH ss lid
@@ -111,7 +111,7 @@ spec = do
       lsPlayerName slot2 `shouldBe` "AI Player 2"
 
     it "rejects full lobby" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       -- Fill the lobby (max 4 players)
@@ -125,14 +125,14 @@ spec = do
         Right _ -> expectationFailure "expected error for full lobby"
 
     it "rejects adding AI to nonexistent lobby" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       result <- Servant.runHandler (addAIH ss "nonexistent-lobby")
       case result of
         Left _ -> pure ()
         Right _ -> expectationFailure "expected error for nonexistent lobby"
 
     it "rejects adding AI after lobby is started" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       _ <- run $ addAIH ss lid
@@ -143,7 +143,7 @@ spec = do
         Right _ -> expectationFailure "expected error for started lobby"
 
     it "rejects add-ai for already started lobby via start then add" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       _ <- run $ joinH ss lid (JoinLobbyRequest "Bob")
@@ -155,7 +155,7 @@ spec = do
 
   describe "AI game play" $ do
     it "starting game with AI slots spawns AI that makes moves" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       _ <- run $ addAIH ss lid
@@ -169,7 +169,7 @@ spec = do
       mgStatus mg `shouldSatisfy` (\s -> s == GameActive || s == GameFinished)
 
     it "human and AI alternate moves in mixed game" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       _ <- run $ addAIH ss lid
@@ -207,7 +207,7 @@ spec = do
             [] -> expectationFailure "expected legal actions for human"
 
     it "human player receives broadcasts when AI acts" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Alice" "Test Lobby")
       let lid = clrLobbyId resp
       _ <- run $ addAIH ss lid
@@ -234,7 +234,7 @@ spec = do
       gotBroadcast `shouldBe` True
 
     it "AI-only game (2 AI) plays to completion within timeout" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       resp <- run $ createH ss (CreateLobbyRequest "Bot" "AI Game")
       let lid = clrLobbyId resp
       -- Mark the creator's slot as AI
@@ -292,7 +292,7 @@ spec = do
 
   describe "checkTurn" $ do
     it "returns AIFinished for nonexistent game" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       result <- atomically $ checkTurn ss "nonexistent-game" "some-session"
       case result of
         AIFinished -> pure ()

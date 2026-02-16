@@ -62,7 +62,7 @@ import Splendor.Server.GameManager
 -- | Create a ServerState with a 2-player game, returning identifiers.
 setupGame :: IO (ServerState, GameId, SessionId, SessionId)
 setupGame = do
-  ss <- newServerState
+  ss <- newServerState NoPersistence
   let s1 = "session-1"
       s2 = "session-2"
       slots = [ LobbySlot s1 "Alice" False
@@ -74,7 +74,7 @@ setupGame = do
 -- | Create a ServerState with a 3-player game, returning identifiers.
 setupGame3 :: IO (ServerState, GameId, SessionId, SessionId, SessionId)
 setupGame3 = do
-  ss <- newServerState
+  ss <- newServerState NoPersistence
   let s1 = "session-1"
       s2 = "session-2"
       s3 = "session-3"
@@ -205,13 +205,13 @@ testApp = snd <$> testAppWithState
 -- | Create a fresh WAI Application along with its ServerState.
 testAppWithState :: IO (ServerState, Application)
 testAppWithState = do
-  ss <- newServerState
+  ss <- newServerState NoPersistence
   pure (ss, mkApp ss)
 
 -- | Run an action with a test server on an ephemeral port.
 withTestServer :: (Warp.Port -> ServerState -> IO a) -> IO a
 withTestServer action = do
-  ss <- newServerState
+  ss <- newServerState NoPersistence
   Warp.testWithApplication (pure (mkApp ss)) (\port -> action port ss)
 
 -- | POST JSON to a path, running the request against an Application.

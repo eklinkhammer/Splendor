@@ -179,7 +179,7 @@ spec = do
 
   describe "newServerState" $ do
     it "initializes all TVars to empty maps" $ do
-      ss <- newServerState
+      ss <- newServerState NoPersistence
       lobbies <- readTVarIO (ssLobbies ss)
       games <- readTVarIO (ssGames ss)
       sessions <- readTVarIO (ssSessions ss)

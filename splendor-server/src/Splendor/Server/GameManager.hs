@@ -26,6 +26,7 @@ import Splendor.Core.Rules.ActionValidation (legalActions, legalGemReturns)
 import Splendor.Core.Setup (initGameState)
 import Splendor.Core.Types
 
+import Splendor.Server.Persistence (saveGame)
 import Splendor.Server.Types
 
 -- -----------------------------------------------------------------
@@ -56,6 +57,7 @@ createGame ss slots = do
     modifyTVar' (ssGames ss) (Map.insert gameId gameTVar)
     -- Register all sessions globally
     modifyTVar' (ssSessions ss) (\m -> Map.union m sessions)
+  persistGame ss gameId mg
   pure gameId
 
 buildSessions :: [LobbySlot] -> GameState -> Map.Map SessionId PlayerSession
@@ -67,6 +69,7 @@ buildSessions slots gs =
            { psSessionId  = lsSessionId slot
            , psPlayerId   = playerId p
            , psPlayerName = lsPlayerName slot
+           , psIsAI       = lsIsAI slot
            })
        | (slot, p) <- pairs
        ]
@@ -92,30 +95,31 @@ processAction ss gid sid action = do
                 let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
-                pure (Right [])
+                pure (Right ([], mg'))
               NeedGemReturn gs' n -> do
                 let gs'' = gs' { gsTurnPhase = MustReturnGems n }
                     mg' = mg { mgGameState = gs'', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 sendGemReturnPrompt mg' n
-                pure (Right [])
+                pure (Right ([], mg'))
               NeedNobleChoice gs' nobles -> do
                 let mg' = mg { mgGameState = gs', mgPendingNobles = Just nobles }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 sendNobleChoicePrompt mg' nobles
-                pure (Right [])
+                pure (Right ([], mg'))
               GameOver gs' result' -> do
                 let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
                 tids <- cleanupSessions ss mg'
-                pure (Right tids)
+                pure (Right (tids, mg'))
   case result of
     Left err -> pure (Left err)
-    Right tids -> do
+    Right (tids, mg') -> do
+      persistGame ss gid mg'
       killAIThreads tids
       pure (Right ())
 
@@ -136,24 +140,25 @@ processGemReturn ss gid sid gems = do
                 let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
-                pure (Right [])
+                pure (Right ([], mg'))
               NeedNobleChoice gs' nobles -> do
                 let mg' = mg { mgGameState = gs', mgPendingNobles = Just nobles }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 sendNobleChoicePrompt mg' nobles
-                pure (Right [])
+                pure (Right ([], mg'))
               GameOver gs' result' -> do
                 let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
                 tids <- cleanupSessions ss mg'
-                pure (Right tids)
+                pure (Right (tids, mg'))
               NeedGemReturn _ _ -> pure (Left "Unexpected NeedGemReturn after gem return")
   case result of
     Left err -> pure (Left err)
-    Right tids -> do
+    Right (tids, mg') -> do
+      persistGame ss gid mg'
       killAIThreads tids
       pure (Right ())
 
@@ -174,19 +179,20 @@ processNobleChoice ss gid sid nid = do
                 let mg' = mg { mgGameState = gs', mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
-                pure (Right [])
+                pure (Right ([], mg'))
               GameOver gs' result' -> do
                 let mg' = mg { mgGameState = gs', mgStatus = GameFinished, mgPendingNobles = Nothing }
                 writeTVar gameTVar mg'
                 broadcastGameState mg'
                 broadcastMessage mg' (GameOverMsg result')
                 tids <- cleanupSessions ss mg'
-                pure (Right tids)
+                pure (Right (tids, mg'))
               NeedGemReturn _ _ -> pure (Left "Unexpected NeedGemReturn after noble choice")
               NeedNobleChoice _ _ -> pure (Left "Unexpected NeedNobleChoice after noble choice")
   case result of
     Left err -> pure (Left err)
-    Right tids -> do
+    Right (tids, mg') -> do
+      persistGame ss gid mg'
       killAIThreads tids
       pure (Right ())
 
@@ -320,4 +326,9 @@ storeAIThreads ss gid tids = atomically $ do
     Nothing -> pure ()
     Just gameTVar ->
       modifyTVar' gameTVar $ \mg -> mg { mgAIThreads = tids }
+
+-- | Persist a managed game to the database (fire-and-forget; ignores errors).
+persistGame :: ServerState -> GameId -> ManagedGame -> IO ()
+persistGame ss gid mg =
+  saveGame (ssPersistence ss) gid (mgGameState mg) (mgStatus mg) (mgSessions mg) (mgPendingNobles mg)
 

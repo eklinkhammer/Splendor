@@ -30,6 +30,8 @@ module Splendor.Server.Types
     -- * Spectator
   , SpectatorId
   , toSpectatorGameView
+    -- * Persistence
+  , PersistenceHandle(..)
     -- * Utilities
   , newUUID
   ) where
@@ -46,6 +48,7 @@ import Data.UUID.V4 qualified as UUID
 import GHC.Generics (Generic)
 
 import Splendor.Core.Types
+import Splendor.Server.Persistence.Handle (PersistenceHandle(..))
 
 -- -----------------------------------------------------------------
 -- Identifiers
@@ -121,6 +124,7 @@ data PlayerSession = PlayerSession
   { psSessionId  :: SessionId
   , psPlayerId   :: PlayerId
   , psPlayerName :: Text
+  , psIsAI       :: Bool
   } deriving stock (Eq, Show, Generic)
     deriving anyclass (ToJSON, FromJSON)
 
@@ -232,16 +236,23 @@ data ManagedGame = ManagedGame
   }
 
 data ServerState = ServerState
-  { ssLobbies  :: TVar (Map LobbyId Lobby)
-  , ssGames    :: TVar (Map GameId (TVar ManagedGame))
-  , ssSessions :: TVar (Map SessionId PlayerSession)
+  { ssLobbies     :: TVar (Map LobbyId Lobby)
+  , ssGames       :: TVar (Map GameId (TVar ManagedGame))
+  , ssSessions    :: TVar (Map SessionId PlayerSession)
+  , ssPersistence :: PersistenceHandle
   }
 
-newServerState :: IO ServerState
-newServerState = ServerState
-  <$> newTVarIO Map.empty
-  <*> newTVarIO Map.empty
-  <*> newTVarIO Map.empty
+newServerState :: PersistenceHandle -> IO ServerState
+newServerState ph = do
+  lobbies  <- newTVarIO Map.empty
+  games    <- newTVarIO Map.empty
+  sessions <- newTVarIO Map.empty
+  pure ServerState
+    { ssLobbies     = lobbies
+    , ssGames       = games
+    , ssSessions    = sessions
+    , ssPersistence = ph
+    }
 
 -- -----------------------------------------------------------------
 -- Utilities

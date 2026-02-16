@@ -14,6 +14,7 @@ import Splendor.Server.API (splendorAPI, splendorServer)
 import Splendor.Server.Config (Config(..), loadConfig)
 import Splendor.Server.Persistence (initPersistence)
 import Splendor.Server.Persistence.Schema (initSchema)
+import Splendor.Server.Restore (restoreGames)
 import Splendor.Server.Types (ServerState, newServerState)
 
 mkApp :: ServerState -> Application
@@ -22,9 +23,10 @@ mkApp ss = serve splendorAPI (splendorServer ss)
 runServer :: IO ()
 runServer = do
   config <- loadConfig
-  _persistence <- initPersistence (configDbPath config)
-  initSchema
-  ss <- newServerState
+  persistence <- initPersistence (configDbPath config)
+  initSchema persistence
+  ss <- newServerState persistence
+  restoreGames ss
   let port = configPort config
   TIO.putStrLn $ "Splendor server starting on port " <> T.pack (show port)
   Warp.run port
