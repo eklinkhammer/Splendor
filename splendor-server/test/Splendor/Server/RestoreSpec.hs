@@ -6,7 +6,7 @@ import Data.Map.Strict qualified as Map
 import Test.Hspec
 
 import Splendor.Core.Types
-import Splendor.Server.GameManager (createGame, processAction, processGemReturn)
+import Splendor.Server.GameManager (createGame, processAction, processGemReturn, processNobleChoice)
 import Splendor.Server.Persistence (saveGame)
 import Splendor.Server.Restore (restoreGames)
 import Splendor.Server.TestHelpers
@@ -187,3 +187,82 @@ spec = do
               result2 <- processGemReturn ss2 gid session (singleGem (GemToken Ruby) n)
               result2 `shouldSatisfy` isRight
             other -> expectationFailure $ "Expected MustReturnGems after restore, got " ++ show other
+
+    it "game in NeedNobleChoice phase survives restart, processNobleChoice works" $ withTempDb $ \ph -> do
+      (ss, gid, s1, s2) <- setupGameWithPersistence ph
+      gameTVar <- lookupGameTVarOrFail ss gid
+      mg <- readTVarIO gameTVar
+      let curIdx = gsCurrentPlayer (mgGameState mg)
+          session = if curIdx == 0 then s1 else s2
+      -- Set up: 2 diamond cards owned + buyable card + 2 nobles requiring 3 diamonds
+      let diamondCard1 = Card "dc1" Tier1 emptyGems Diamond 0
+          diamondCard2 = Card "dc2" Tier1 emptyGems Diamond 0
+          buyableCard  = Card "buyMe" Tier1 (singleGem (GemToken Ruby) 1) Diamond 0
+          noble1 = Noble "noble-a" (Map.fromList [(Diamond, 3)]) 3
+          noble2 = Noble "noble-b" (Map.fromList [(Diamond, 3)]) 3
+      atomically $ modifyTVar' gameTVar $ \mg' ->
+        let gs = mgGameState mg'
+            ps = gsPlayers gs
+            cur = ps !! curIdx
+            cur' = cur
+              { playerPurchased = [diamondCard1, diamondCard2]
+              , playerTokens = mkTokens [(GemToken Ruby, 1)]
+              }
+            ps' = replaceAt curIdx cur' ps
+            board' = (gsBoard gs)
+              { boardTier1 = TierRow [] [buyableCard]
+              , boardNobles = [noble1, noble2]
+              }
+        in mg' { mgGameState = gs { gsPlayers = ps', gsBoard = board' } }
+      result <- processAction ss gid session (BuyCard (FromDisplay "buyMe") (singleGem (GemToken Ruby) 1))
+      result `shouldSatisfy` isRight
+      mg2 <- lookupGameOrFail ss gid
+      case mgPendingNobles mg2 of
+        Just nobles -> length nobles `shouldBe` 2
+        Nothing -> expectationFailure "Expected mgPendingNobles to be set"
+      -- "Restart"
+      ss2 <- newServerState ph
+      restoreGames ss2
+      games <- readTVarIO (ssGames ss2)
+      case Map.lookup gid games of
+        Nothing -> expectationFailure "Game not found after restart"
+        Just tv -> do
+          mg3 <- readTVarIO tv
+          case mgPendingNobles mg3 of
+            Just nobles@(n:_) -> do
+              length nobles `shouldBe` 2
+              result2 <- processNobleChoice ss2 gid session (nobleId n)
+              result2 `shouldSatisfy` isRight
+            Just [] -> expectationFailure "Expected non-empty pendingNobles after restore"
+            Nothing -> expectationFailure "Expected mgPendingNobles after restore"
+
+    it "3-player game restored with all sessions" $ withTempDb $ \ph -> do
+      (_ss, gid, s1, s2, s3) <- setupGame3WithPersistence ph
+      ss2 <- newServerState ph
+      restoreGames ss2
+      games <- readTVarIO (ssGames ss2)
+      case Map.lookup gid games of
+        Nothing -> expectationFailure "Game not found after restore"
+        Just tv -> do
+          mg <- readTVarIO tv
+          Map.size (mgSessions mg) `shouldBe` 3
+      sessions <- readTVarIO (ssSessions ss2)
+      Map.member s1 sessions `shouldBe` True
+      Map.member s2 sessions `shouldBe` True
+      Map.member s3 sessions `shouldBe` True
+
+    it "AI sessions trigger thread respawn on restore" $ withTempDb $ \ph -> do
+      ss <- newServerState ph
+      let slots = [ LobbySlot "human" "Alice" False
+                  , LobbySlot "ai-bot" "Bot" True
+                  ]
+      _gid <- createGame ss slots
+      -- "Restart"
+      ss2 <- newServerState ph
+      restoreGames ss2
+      games <- readTVarIO (ssGames ss2)
+      case Map.toList games of
+        [] -> expectationFailure "Game not found after restore"
+        ((_, tv):_) -> do
+          mg <- readTVarIO tv
+          length (mgAIThreads mg) `shouldBe` 1

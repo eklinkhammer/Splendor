@@ -1,5 +1,6 @@
 module Splendor.Server.PersistenceSpec (spec) where
 
+import Control.Exception (bracket)
 import Data.Map.Strict qualified as Map
 import Data.Text qualified as T
 import Database.SQLite.Simple
@@ -25,14 +26,17 @@ spec = do
         PersistenceHandle _ -> expectationFailure "Expected NoPersistence"
 
     it "Just filepath returns PersistenceHandle" $ do
-      tmpDir <- getCanonicalTemporaryDirectory
-      dir <- createTempDirectory tmpDir "splendor-test-init"
-      let dbPath = dir </> "test.db"
-      ph <- initPersistence (Just dbPath)
-      case ph of
-        PersistenceHandle _ -> pure ()
-        NoPersistence -> expectationFailure "Expected PersistenceHandle"
-      removeDirectoryRecursive dir
+      bracket
+        (do tmpDir <- getCanonicalTemporaryDirectory
+            dir <- createTempDirectory tmpDir "splendor-test-init"
+            pure dir)
+        removeDirectoryRecursive
+        $ \dir -> do
+          let dbPath = dir </> "test.db"
+          ph <- initPersistence (Just dbPath)
+          case ph of
+            PersistenceHandle _ -> pure ()
+            NoPersistence -> expectationFailure "Expected PersistenceHandle"
 
   describe "initSchema" $ do
     it "creates tables on fresh database" $ withTempDb $ \ph -> do

@@ -3,6 +3,7 @@ module Splendor.Server.TestHelpers
     setupGame
   , setupGame3
   , setupGameWithPersistence
+  , setupGame3WithPersistence
     -- * Persistence helpers
   , withTempDb
     -- * Lookups
@@ -105,6 +106,20 @@ setupGameWithPersistence ph = do
               ]
   gid <- createGame ss slots
   pure (ss, gid, s1, s2)
+
+-- | Create a ServerState with real persistence and a 3-player game.
+setupGame3WithPersistence :: PersistenceHandle -> IO (ServerState, GameId, SessionId, SessionId, SessionId)
+setupGame3WithPersistence ph = do
+  ss <- newServerState ph
+  let s1 = "session-1"
+      s2 = "session-2"
+      s3 = "session-3"
+      slots = [ LobbySlot s1 "Alice" False
+              , LobbySlot s2 "Bob" False
+              , LobbySlot s3 "Charlie" False
+              ]
+  gid <- createGame ss slots
+  pure (ss, gid, s1, s2, s3)
 
 -- | Run an action with a temporary SQLite database. The database file is
 --   created in a temp directory and cleaned up after the callback returns.

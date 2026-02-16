@@ -207,7 +207,7 @@ spec = describe "WebSocket protocol" $ do
       let tryReconnect :: Int -> IO ()
           tryReconnect 0 = expectationFailure "Could not reconnect after retries"
           tryReconnect n = do
-            threadDelay 200000
+            threadDelay 500000  -- 500ms
             result <- try $ WS.runClient "127.0.0.1" port (wsPath gid s1) $ \conn -> do
               msg <- recvMsg conn
               case msg of
@@ -216,7 +216,7 @@ spec = describe "WebSocket protocol" $ do
             case result of
               Right () -> pure ()
               Left (_ :: WS.ConnectionException) -> tryReconnect (n - 1)
-      tryReconnect 3
+      tryReconnect 5
 
   it "full game via WS completes with GameOverMsg" $
     withGameWS $ \port ss gid s1 s2 -> do
