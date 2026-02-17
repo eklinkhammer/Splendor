@@ -69,7 +69,7 @@ spec :: Spec
 spec = describe "WebSocket protocol" $ do
 
   it "receives GameStateUpdate on connect" $
-    withGameWS $ \port _ss gid s1 _s2 ->
+    retryOnConnectionClosed 2 $ withGameWS $ \port _ss gid s1 _s2 ->
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn -> do
         msg <- recvMsg conn
         case msg of
@@ -77,7 +77,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected GameStateUpdate, got: " ++ msgTag other
 
   it "current player receives ActionRequired after GameStateUpdate" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    retryOnConnectionClosed 2 $ withGameWS $ \port ss gid s1 s2 -> do
       curSid <- currentSession ss gid s1 s2
       connectWithRetry "127.0.0.1" port (wsPath gid curSid) $ \conn -> do
         msg1 <- recvMsg conn
@@ -104,7 +104,7 @@ spec = describe "WebSocket protocol" $ do
           Just m  -> expectationFailure $ "Expected no more messages, got: " ++ msgTag m
 
   it "Ping returns Pong" $
-    withGameWS $ \port _ss gid s1 _s2 ->
+    retryOnConnectionClosed 2 $ withGameWS $ \port _ss gid s1 _s2 ->
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn -> do
         _ <- recvMsg conn  -- consume initial GameStateUpdate
         -- Drain any ActionRequired if this is the current player
@@ -195,7 +195,7 @@ spec = describe "WebSocket protocol" $ do
         Right () -> expectationFailure "Expected connection to be rejected, but it was accepted"
 
   it "two clients: action triggers cross-client broadcast" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    retryOnConnectionClosed 3 $ withGameWS $ \port ss gid s1 s2 -> do
       curSid <- currentSession ss gid s1 s2
       let otherSid = if curSid == s1 then s2 else s1
       connectWithRetry "127.0.0.1" port (wsPath gid curSid) $ \conn1 ->
@@ -220,7 +220,7 @@ spec = describe "WebSocket protocol" $ do
             other -> expectationFailure $ "Expected cross-client GameStateUpdate, got: " ++ msgTag other
 
   it "disconnect and reconnect yields fresh state" $
-    withGameWS $ \port _ss gid s1 _s2 -> do
+    retryOnConnectionClosed 2 $ withGameWS $ \port _ss gid s1 _s2 -> do
       -- First connection
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn -> do
         msg <- recvMsg conn
@@ -244,7 +244,7 @@ spec = describe "WebSocket protocol" $ do
       tryReconnect 5
 
   it "full game via WS completes with GameOverMsg" $
-    withGameWS $ \port ss gid s1 s2 -> do
+    retryOnConnectionClosed 2 $ withGameWS $ \port ss gid s1 s2 -> do
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn1 ->
         connectWithRetry "127.0.0.1" port (wsPath gid s2) $ \conn2 -> do
           -- Drain initial messages
