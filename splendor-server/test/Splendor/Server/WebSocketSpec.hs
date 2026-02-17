@@ -90,7 +90,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected ActionRequired, got: " ++ msgTag other
 
   it "non-current player receives only GameStateUpdate" $
-    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
+    retryOnConnectionClosed 2 $ withGameWS $ \port ss gid s1 s2 -> do
       nonCurSid <- wrongSession ss gid s1 s2
       connectWithRetry "127.0.0.1" port (wsPath gid nonCurSid) $ \conn -> do
         msg1 <- recvMsg conn
@@ -116,7 +116,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected Pong, got: " ++ msgTag other
 
   it "valid TakeGems action triggers GameStateUpdate broadcast" $
-    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
+    retryOnConnectionClosed 3 $ withGameWS $ \port ss gid s1 s2 -> do
       curSid <- currentSession ss gid s1 s2
       let otherSid = if curSid == s1 then s2 else s1
       connectWithRetry "127.0.0.1" port (wsPath gid curSid) $ \conn1 ->
@@ -146,7 +146,7 @@ spec = describe "WebSocket protocol" $ do
             other -> expectationFailure $ "P2 expected GameStateUpdate, got: " ++ msgTag other
 
   it "action from wrong player returns ErrorMsg" $
-    withGameWS $ \port ss gid s1 s2 -> retryOnConnectionClosed 2 $ do
+    retryOnConnectionClosed 2 $ withGameWS $ \port ss gid s1 s2 -> do
       nonCurSid <- wrongSession ss gid s1 s2
       connectWithRetry "127.0.0.1" port (wsPath gid nonCurSid) $ \conn -> do
         _ <- recvMsg conn  -- GameStateUpdate
@@ -160,7 +160,7 @@ spec = describe "WebSocket protocol" $ do
           other -> expectationFailure $ "Expected ErrorMsg, got: " ++ msgTag other
 
   it "malformed JSON returns ErrorMsg" $
-    withGameWS $ \port _ss gid s1 _s2 -> retryOnConnectionClosed 2 $
+    retryOnConnectionClosed 2 $ withGameWS $ \port _ss gid s1 _s2 ->
       connectWithRetry "127.0.0.1" port (wsPath gid s1) $ \conn -> do
         _ <- recvMsg conn  -- GameStateUpdate
         _ <- timeout 500000 (recvMsg conn)
