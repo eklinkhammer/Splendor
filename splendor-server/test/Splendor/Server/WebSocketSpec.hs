@@ -121,11 +121,11 @@ spec = describe "WebSocket protocol" $ do
       let otherSid = if curSid == s1 then s2 else s1
       connectWithRetry "127.0.0.1" port (wsPath gid curSid) $ \conn1 ->
         connectWithRetry "127.0.0.1" port (wsPath gid otherSid) $ \conn2 -> do
-          -- Drain initial messages for both
+          -- Drain initial messages explicitly (avoid timeout which can
+          -- corrupt WS connection state via async exceptions)
           _ <- recvMsg conn1  -- GameStateUpdate
-          _ <- timeout 500000 (recvMsg conn1)  -- possibly ActionRequired
-          _ <- recvMsg conn2  -- GameStateUpdate
-          _ <- timeout 500000 (recvMsg conn2)  -- possibly ActionRequired
+          _ <- recvMsg conn1  -- ActionRequired (conn1 is current player)
+          _ <- recvMsg conn2  -- GameStateUpdate (conn2 is non-current, no extra msg)
           -- Get legal actions
           mg <- lookupGameOrFail ss gid
           let gs = mgGameState mg

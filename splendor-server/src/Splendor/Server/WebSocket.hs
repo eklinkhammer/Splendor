@@ -6,7 +6,7 @@ module Splendor.Server.WebSocket
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import Control.Concurrent.STM
-import Control.Exception (finally)
+import Control.Exception (SomeException, finally, try)
 import Data.Aeson (decode, encode)
 import Data.Map.Strict qualified as Map
 import Data.Text (Text)
@@ -75,11 +75,14 @@ sendInitialState conn gameTVar ps = do
     _ -> pure ()
 
 -- | Sender loop: reads from TChan and sends to WebSocket.
+--   Exits gracefully on any connection exception (client disconnected).
 senderLoop :: WS.Connection -> TChan ServerMessage -> IO ()
 senderLoop conn chan = do
   msg <- atomically $ readTChan chan
-  WS.sendTextData conn (encode msg)
-  senderLoop conn chan
+  result <- try $ WS.sendTextData conn (encode msg)
+  case result of
+    Left (_ :: SomeException) -> pure ()  -- connection closed, exit silently
+    Right () -> senderLoop conn chan
 
 -- | Receiver loop: reads from WebSocket, parses ClientMessage, dispatches.
 receiverLoop :: ServerState -> WS.Connection -> GameId -> SessionId -> IO ()
