@@ -241,8 +241,9 @@ spec = do
       -- Spawn both AI threads: one throwing, one random
       tid1 <- forkIO $ aiLoopWith ss gid s1 throwingAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
-      -- Game should still finish despite initial exceptions (fallback action used)
-      finished <- waitForGameEnd ss gid 30
+      -- Game should still finish despite initial exceptions (fallback action used).
+      -- 120s timeout: random games take ~100 turns × (500ms move delay + 200ms poll) ≈ 70s on slow CI.
+      finished <- waitForGameEnd ss gid 120
       -- Clean up threads
       killThread tid1
       killThread tid2
@@ -256,7 +257,7 @@ spec = do
       tid1 <- forkIO $ aiLoopWith ss gid s1 badAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
       -- Game should still finish despite initial rejections
-      finished <- waitForGameEnd ss gid 30
+      finished <- waitForGameEnd ss gid 120
       killThread tid1
       killThread tid2
       finished `shouldBe` True
