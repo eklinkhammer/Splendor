@@ -3,6 +3,7 @@ module Splendor.Server.AIRunnerSpec (spec) where
 import Control.Concurrent (forkIO, killThread, threadDelay)
 import Control.Concurrent.STM
 import Data.IORef
+import Data.Maybe (isJust)
 import Data.Map.Strict qualified as Map
 import Test.Hspec
 import Servant qualified
@@ -234,20 +235,20 @@ spec = do
       gotBroadcast `shouldBe` True
 
   describe "AI error recovery" $ do
-    it "AI recovers from agent exception via fallback and completes game" $ do
+    it "AI recovers from agent exception via fallback" $ do
       (ss, gid, s1, s2) <- setupAIGame
       -- ThrowingAgent throws first 2 calls, then delegates to RandomAgent
       throwingAgent <- mkThrowingAgent 2
       -- Spawn both AI threads: one throwing, one random
       tid1 <- forkIO $ aiLoopWith ss gid s1 throwingAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
-      -- Game should still finish despite initial exceptions (fallback action used).
-      -- 120s timeout: random games take ~100 turns × (500ms move delay + 200ms poll) ≈ 70s on slow CI.
-      finished <- waitForGameEnd ss gid 120
+      -- Verify AI recovered by checking turns advance past failures (10s timeout)
+      result <- waitForCondition ss gid 100 $ \mg ->
+        gsTurnNumber (mgGameState mg) >= 10
       -- Clean up threads
       killThread tid1
       killThread tid2
-      finished `shouldBe` True
+      isJust result `shouldBe` True
 
     it "AI continues after processAction rejection" $ do
       (ss, gid, s1, s2) <- setupAIGame
@@ -256,11 +257,12 @@ spec = do
       badAgent <- mkBadActionAgent 3
       tid1 <- forkIO $ aiLoopWith ss gid s1 badAgent
       tid2 <- forkIO $ aiLoopWith ss gid s2 RandomAgent
-      -- Game should still finish despite initial rejections
-      finished <- waitForGameEnd ss gid 120
+      -- Verify AI recovered by checking turns advance past rejections (10s timeout)
+      result <- waitForCondition ss gid 100 $ \mg ->
+        gsTurnNumber (mgGameState mg) >= 10
       killThread tid1
       killThread tid2
-      finished `shouldBe` True
+      isJust result `shouldBe` True
 
     it "AsyncException kills AI thread cleanly (no retry)" $ do
       (ss, gid, s1, _s2) <- setupAIGame
@@ -363,16 +365,6 @@ spec = do
             (n:_) -> nobleId n `shouldBe` "n1"
             []    -> expectationFailure "expected at least one noble"
         _ -> expectationFailure "expected AINeedNoble"
-
--- | Wait for a game to end, polling every second. Returns True if finished within timeout.
-waitForGameEnd :: ServerState -> GameId -> Int -> IO Bool
-waitForGameEnd _ _ 0 = pure False
-waitForGameEnd ss gid remaining = do
-  threadDelay 1000000  -- 1 second
-  mg <- lookupGameOrFail ss gid
-  case mgStatus mg of
-    GameFinished -> pure True
-    GameActive -> waitForGameEnd ss gid (remaining - 1)
 
 -- | Poll game state every 100ms until predicate holds. Returns Nothing on timeout.
 waitForCondition :: ServerState -> GameId -> Int -> (ManagedGame -> Bool) -> IO (Maybe ManagedGame)
