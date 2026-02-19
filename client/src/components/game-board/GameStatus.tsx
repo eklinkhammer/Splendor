@@ -3,10 +3,9 @@ import type { PublicGameView } from '../../types';
 interface Props {
   gameView: PublicGameView;
   selfPlayerId: string | null;
-  isHotseat?: boolean;
 }
 
-export function GameStatus({ gameView, selfPlayerId, isHotseat }: Props) {
+export function GameStatus({ gameView, selfPlayerId }: Props) {
   const currentPlayer = gameView.pgvPlayers[gameView.pgvCurrentPlayer];
   const isMyTurn = currentPlayer?.ppPlayerId === selfPlayerId;
 
@@ -38,7 +37,7 @@ export function GameStatus({ gameView, selfPlayerId, isHotseat }: Props) {
         )}
         <span className={`text-sm sm:text-lg font-bold ${isMyTurn ? 'text-green-400' : ''}`}>
           {isMyTurn
-            ? (isHotseat ? `${currentPlayer?.ppPlayerName ?? '?'}'s Turn` : 'Your Turn')
+            ? 'Your Turn'
             : `${currentPlayer?.ppPlayerName ?? '?'}'s Turn`}
         </span>
       </div>

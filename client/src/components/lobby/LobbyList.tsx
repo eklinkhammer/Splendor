@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { listLobbies } from '../../services/api';
 import type { Lobby } from '../../types';
 
-interface Props {
-  onSelect: (lobby: Lobby) => void;
-}
-
-export function LobbyList({ onSelect }: Props) {
+export function LobbyList() {
   const [lobbies, setLobbies] = useState<Lobby[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let active = true;
@@ -51,7 +49,7 @@ export function LobbyList({ onSelect }: Props) {
                 </span>
               </div>
               <button
-                onClick={() => onSelect(lobby)}
+                onClick={() => navigate(`/lobby/${lobby.lobbyId}`)}
                 className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
               >
                 Join

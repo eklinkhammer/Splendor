@@ -3,7 +3,7 @@ import { createLobby } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
 
 interface Props {
-  onCreated: (lobbyId: string) => void;
+  onCreated: (lobbyId: string, sessionId: string) => void;
 }
 
 export function CreateLobbyForm({ onCreated }: Props) {
@@ -23,7 +23,7 @@ export function CreateLobbyForm({ onCreated }: Props) {
       const res = await createLobby(playerName.trim(), lobbyName.trim());
       setSession(res.clrSessionId, playerName.trim());
       setLobbyId(res.clrLobbyId);
-      onCreated(res.clrLobbyId);
+      onCreated(res.clrLobbyId, res.clrSessionId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create lobby');
     } finally {

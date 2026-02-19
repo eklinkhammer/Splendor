@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { GameResult } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useGameStore } from '../../stores/gameStore';
@@ -13,13 +13,12 @@ const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
 export function GameOverOverlay({ result }: Props) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get('s');
   const clearSession = useSessionStore((s) => s.clear);
   const setSession = useSessionStore((s) => s.setSession);
-  const setLobbyId = useSessionStore((s) => s.setLobbyId);
   const setGameId = useSessionStore((s) => s.setGameId);
   const playerName = useSessionStore((s) => s.playerName);
-  const localSessions = useSessionStore((s) => s.localSessions);
-  const addLocalSession = useSessionStore((s) => s.addLocalSession);
   const resetGame = useGameStore((s) => s.reset);
   const gameView = useGameStore((s) => s.gameView);
   const [playingAgain, setPlayingAgain] = useState(false);
@@ -34,27 +33,15 @@ export function GameOverOverlay({ result }: Props) {
     if (!gameView || !playerName) return;
     setPlayingAgain(true);
     try {
-      const localPlayerNames = localSessions.map((s) => s.playerName);
-      const totalLocalHumans = 1 + localPlayerNames.length; // creator + local players
-      const aiCount = gameView.pgvPlayers.length - totalLocalHumans;
-      const hasRemoteHumans = gameView.pgvPlayers.length > totalLocalHumans + aiCount;
+      // Count AI players (all non-self players are AI in the new model)
+      const selfPlayer = gameView.pgvPlayers.find((p) => p.ppReserved !== null);
+      const aiCount = gameView.pgvPlayers.filter((p) => p.ppPlayerId !== selfPlayer?.ppPlayerId).length;
 
-      const res = await playAgain(playerName, `${playerName}'s Game`, aiCount, localPlayerNames);
+      const res = await playAgain(playerName, `${playerName}'s Game`, aiCount);
       resetGame();
       setSession(res.sessionId, playerName);
-      setLobbyId(res.lobbyId);
-      for (const ls of res.localSessions) {
-        addLocalSession(ls.sessionId, ls.playerName);
-      }
-
-      if (hasRemoteHumans) {
-        // Has remote human players — go to lobby so they can rejoin
-        navigate('/');
-      } else {
-        // All local (hotseat + AI) — jump straight into the new game
-        setGameId(res.gameId);
-        navigate(`/game/${res.gameId}`);
-      }
+      setGameId(res.gameId);
+      navigate(`/game/${res.gameId}?s=${res.sessionId}`);
     } catch {
       setPlayingAgain(false);
     }
@@ -108,15 +95,17 @@ export function GameOverOverlay({ result }: Props) {
         </div>
 
         <div className="flex gap-3 justify-center">
-          <button
-            onClick={handlePlayAgain}
-            disabled={playingAgain}
-            className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl
-              hover:from-green-700 hover:to-green-800 font-semibold shadow-md
-              transition-all duration-200 hover:shadow-lg disabled:opacity-50"
-          >
-            {playingAgain ? 'Setting up...' : 'Play Again'}
-          </button>
+          {sessionId && (
+            <button
+              onClick={handlePlayAgain}
+              disabled={playingAgain}
+              className="px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl
+                hover:from-green-700 hover:to-green-800 font-semibold shadow-md
+                transition-all duration-200 hover:shadow-lg disabled:opacity-50"
+            >
+              {playingAgain ? 'Setting up...' : 'Play Again'}
+            </button>
+          )}
           <button
             onClick={handleReturn}
             className="px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl

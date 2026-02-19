@@ -67,14 +67,8 @@ export async function playAgain(
   playerName: string,
   lobbyName: string,
   aiCount: number,
-  localPlayerNames: string[] = [],
-): Promise<{ lobbyId: string; sessionId: string; gameId: string; localSessions: { sessionId: string; playerName: string }[] }> {
+): Promise<{ lobbyId: string; sessionId: string; gameId: string }> {
   const lobby = await createLobby(playerName, lobbyName);
-  const localSessions: { sessionId: string; playerName: string }[] = [];
-  for (const name of localPlayerNames) {
-    const res = await joinLobby(lobby.clrLobbyId, name);
-    localSessions.push({ sessionId: res.jlrSessionId, playerName: name });
-  }
   for (let i = 0; i < aiCount; i++) {
     await addAI(lobby.clrLobbyId);
   }
@@ -83,6 +77,5 @@ export async function playAgain(
     lobbyId: lobby.clrLobbyId,
     sessionId: lobby.clrSessionId,
     gameId: game.sgrGameId,
-    localSessions,
   };
 }

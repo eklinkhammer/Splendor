@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useGameSocket } from '../hooks/useGameSocket';
 import { useSessionStore } from '../stores/sessionStore';
 import { useGameStore } from '../stores/gameStore';
@@ -23,9 +23,9 @@ export function GamePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const isSpectator = location.pathname.endsWith('/spectate');
-  const sessionId = useSessionStore((s) => s.sessionId);
-  const localSessions = useSessionStore((s) => s.localSessions);
+  const sessionId = searchParams.get('s');
   const gameView = useGameStore((s) => s.gameView);
   const gameResult = useGameStore((s) => s.gameResult);
   const selfPlayerId = useGameStore((s) => s.selfPlayerId);
@@ -41,6 +41,13 @@ export function GamePage() {
     }
   }, [isSpectator, sessionId, navigate]);
 
+  // Cache gameId + sessionId in sessionStore for "resume" link on home page
+  useEffect(() => {
+    if (id && sessionId) {
+      useSessionStore.getState().setGameId(id);
+    }
+  }, [id, sessionId]);
+
   // REST fallback: load game state if WebSocket hasn't delivered yet (players only)
   useEffect(() => {
     if (id && sessionId && !gameView && !isSpectator) {
@@ -55,15 +62,7 @@ export function GamePage() {
     }
   }, [id, sessionId, gameView, isSpectator]);
 
-  // Build sessions list for WebSocket connections
-  const allSessions = useMemo(() => {
-    if (isSpectator || !sessionId) return [];
-    const primary = [{ sessionId }];
-    return [...primary, ...localSessions.map((s) => ({ sessionId: s.sessionId }))];
-  }, [isSpectator, sessionId, localSessions]);
-
-  const isHotseat = localSessions.length > 0;
-  const { send } = useGameSocket(id ?? null, allSessions, isSpectator);
+  const { send } = useGameSocket(id ?? null, sessionId, isSpectator);
 
   // Derive player tokens and bank gold for gem return prediction
   const selfPlayer = useMemo(
@@ -168,13 +167,10 @@ export function GamePage() {
     );
   }, [isSpectator, selectedDeckTier, handleDeckReserve, clearSelection]);
 
-  // Cleanup on unmount — reset game state and clear stale session IDs
+  // Cleanup on unmount — reset game state
   useEffect(() => {
     return () => {
       reset();
-      useSessionStore.getState().setGameId(null);
-      useSessionStore.getState().setLobbyId(null);
-      useSessionStore.getState().clearLocalSessions();
     };
   }, [reset]);
 
@@ -280,7 +276,7 @@ export function GamePage() {
         <ErrorBanner />
 
         <div className="mb-2 sm:mb-3">
-          <GameStatus gameView={gameView} selfPlayerId={isSpectator ? null : selfPlayerId} isHotseat={isHotseat} />
+          <GameStatus gameView={gameView} selfPlayerId={isSpectator ? null : selfPlayerId} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
