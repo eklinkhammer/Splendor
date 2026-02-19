@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getLobby, startGame, addAI, leaveLobby } from '../../services/api';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -16,6 +16,8 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
   const [addingAI, setAddingAI] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const navigate = useNavigate();
   const clearSession = useSessionStore((s) => s.clear);
   const setGameId = useSessionStore((s) => s.setGameId);
@@ -88,14 +90,23 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
     }
   };
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
+
   const handleCopyInvite = async () => {
     const url = `${window.location.origin}/lobby/${lobbyId}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopyFailed(false);
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback: do nothing
+      setCopyFailed(true);
     }
   };
 
@@ -161,6 +172,14 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
           >
             {copied ? 'Copied!' : 'Copy Invite Link'}
           </button>
+          {copyFailed && (
+            <input
+              readOnly
+              value={`${window.location.origin}/lobby/${lobbyId}`}
+              className="w-full px-3 py-2 bg-gray-700 text-gray-300 text-sm rounded border border-gray-600 select-all"
+              onFocus={(e) => e.target.select()}
+            />
+          )}
           {canAddMore && (
             <button
               onClick={handleAddAI}

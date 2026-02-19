@@ -65,6 +65,7 @@ export interface PublicPlayer {
   ppReserved: Card[] | null; // Just for self, Nothing for opponents
   ppNobles: Noble[];
   ppPrestige: number;
+  ppIsAI: boolean;
 }
 
 // --- Game state types ---

@@ -4,6 +4,7 @@ import Control.Concurrent.STM (readTVarIO)
 import Data.Aeson (Value(..), encode, decode)
 import Data.Aeson.KeyMap qualified as KM
 import Data.Map.Strict qualified as Map
+import Data.Set qualified as Set
 import Data.Time (UTCTime(..))
 import Data.Time.Calendar (fromGregorian)
 import Test.Hspec
@@ -55,52 +56,52 @@ spec = do
           }
 
     it "viewer sees own reserved cards as Just [cards]" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       ppReserved pp1 `shouldBe` Just [reserved1]
 
     it "viewer sees opponents' reserved as Nothing" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp2 = pgvPlayers view !! 1
       ppReserved pp2 `shouldBe` Nothing
 
     it "reserved count is correct for self" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       ppReservedCount pp1 `shouldBe` 1
 
     it "reserved count is correct for opponent" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp2 = pgvPlayers view !! 1
       ppReservedCount pp2 `shouldBe` 1
 
     it "player names are preserved" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
       map ppPlayerName (pgvPlayers view) `shouldBe` ["Alice", "Bob"]
 
     it "player tokens are preserved" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       ppTokens pp1 `shouldBe` tokens1
 
     it "purchased cards are preserved" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       ppPurchased pp1 `shouldBe` [card1]
 
     it "player nobles are preserved" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       ppNobles pp1 `shouldBe` [noble1]
 
     it "prestige is calculated" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pp1 = pgvPlayers view !! 0
       -- card1 prestige (1) + noble1 prestige (3) = 4
       ppPrestige pp1 `shouldBe` 4
 
     it "board is converted to PublicBoard (deck counts, not cards)" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
           pb = pgvBoard view
       publicDeckCount (publicTier1 pb) `shouldBe` 1
       publicDisplay (publicTier1 pb) `shouldBe` [card1]
@@ -108,14 +109,14 @@ spec = do
       publicDeckCount (publicTier3 pb) `shouldBe` 0
 
     it "game metadata (currentPlayer, turnNumber, phase, turnPhase) preserved" $ do
-      let view = toPublicGameView "p1" gs
+      let view = toPublicGameView "p1" Set.empty gs
       pgvCurrentPlayer view `shouldBe` 0
       pgvTurnNumber view `shouldBe` 5
       pgvPhase view `shouldBe` InProgress
       pgvTurnPhase view `shouldBe` AwaitingAction
 
     it "opponent viewing sees their own reserved" $ do
-      let view = toPublicGameView "p2" gs
+      let view = toPublicGameView "p2" Set.empty gs
           pp2 = pgvPlayers view !! 1
           pp1 = pgvPlayers view !! 0
       ppReserved pp2 `shouldBe` Just [reserved2]

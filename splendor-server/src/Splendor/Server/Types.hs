@@ -33,6 +33,7 @@ module Splendor.Server.Types
     -- * Persistence
   , PersistenceHandle(..)
     -- * Utilities
+  , aiPlayerIds
   , newUUID
   ) where
 
@@ -41,6 +42,8 @@ import Control.Concurrent.STM (TChan, TVar, newTVarIO)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Map.Strict (Map)
 import Data.Map.Strict qualified as Map
+import Data.Set (Set)
+import Data.Set qualified as Set
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.UUID qualified as UUID
@@ -151,6 +154,7 @@ data PublicPlayer = PublicPlayer
   , ppReserved      :: Maybe [Card]  -- Just for self, Nothing for opponents
   , ppNobles        :: [Noble]
   , ppPrestige      :: Int
+  , ppIsAI          :: Bool
   } deriving stock (Eq, Show, Generic)
     deriving anyclass (ToJSON, FromJSON)
 
@@ -167,19 +171,19 @@ data PublicGameView = PublicGameView
 
 -- | Build a personalized public view for a specific player.
 --   The requesting player sees their own reserved cards; opponents see count only.
-toPublicGameView :: PlayerId -> GameState -> PublicGameView
-toPublicGameView viewerId gs = PublicGameView
+toPublicGameView :: PlayerId -> Set PlayerId -> GameState -> PublicGameView
+toPublicGameView viewerId aiIds gs = PublicGameView
   { pgvGameId        = gsGameId gs
   , pgvBoard         = toPublicBoard (gsBoard gs)
-  , pgvPlayers       = map (toPublicPlayer viewerId) (gsPlayers gs)
+  , pgvPlayers       = map (toPublicPlayer viewerId aiIds) (gsPlayers gs)
   , pgvCurrentPlayer = gsCurrentPlayer gs
   , pgvTurnNumber    = gsTurnNumber gs
   , pgvPhase         = gsPhase gs
   , pgvTurnPhase     = gsTurnPhase gs
   }
 
-toPublicPlayer :: PlayerId -> Player -> PublicPlayer
-toPublicPlayer viewerId p = PublicPlayer
+toPublicPlayer :: PlayerId -> Set PlayerId -> Player -> PublicPlayer
+toPublicPlayer viewerId aiIds p = PublicPlayer
   { ppPlayerId      = playerId p
   , ppPlayerName    = playerName p
   , ppTokens        = playerTokens p
@@ -190,10 +194,11 @@ toPublicPlayer viewerId p = PublicPlayer
                       else Nothing
   , ppNobles        = playerNobles p
   , ppPrestige      = playerPrestige p
+  , ppIsAI          = Set.member (playerId p) aiIds
   }
 
 -- | Build a spectator view (no reserved cards visible).
-toSpectatorGameView :: GameState -> PublicGameView
+toSpectatorGameView :: Set PlayerId -> GameState -> PublicGameView
 toSpectatorGameView = toPublicGameView ""
 
 -- -----------------------------------------------------------------
@@ -257,6 +262,11 @@ newServerState ph = do
 -- -----------------------------------------------------------------
 -- Utilities
 -- -----------------------------------------------------------------
+
+-- | Extract the set of AI player IDs from a managed game's sessions.
+aiPlayerIds :: ManagedGame -> Set PlayerId
+aiPlayerIds mg =
+  Set.fromList [psPlayerId ps | ps <- Map.elems (mgSessions mg), psIsAI ps]
 
 newUUID :: IO Text
 newUUID = UUID.toText <$> UUID.nextRandom

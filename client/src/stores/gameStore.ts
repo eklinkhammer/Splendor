@@ -31,7 +31,7 @@ interface GameState {
   selfPlayerId: PlayerId | null;
 
   setConnected: (connected: boolean) => void;
-  handleServerMessage: (sessionId: string, msg: ServerMessage) => void;
+  handleServerMessage: (msg: ServerMessage) => void;
   clearError: () => void;
   reset: () => void;
 }
@@ -52,7 +52,7 @@ export const useGameStore = create<GameState>()((set, get) => ({
 
   setConnected: (connected) => set({ connected }),
 
-  handleServerMessage: (_sessionId, msg) => {
+  handleServerMessage: (msg) => {
     switch (msg.tag) {
       case 'GameStateUpdate': {
         const view = msg.contents;

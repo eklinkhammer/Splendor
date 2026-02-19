@@ -12,6 +12,7 @@ function makePlayer(overrides?: Partial<PublicPlayer>): PublicPlayer {
     ppReserved: null,
     ppNobles: [],
     ppPrestige: 0,
+    ppIsAI: false,
     ...overrides,
   };
 }
@@ -90,7 +91,7 @@ describe('gameStore', () => {
 
   describe('clearError', () => {
     it('clears an existing error', () => {
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ErrorMsg', contents: 'oops' });
+      useGameStore.getState().handleServerMessage({ tag: 'ErrorMsg', contents: 'oops' });
       expect(useGameStore.getState().error).toBe('oops');
       useGameStore.getState().clearError();
       expect(useGameStore.getState().error).toBeNull();
@@ -106,11 +107,11 @@ describe('gameStore', () => {
     it('restores all fields after mutations', () => {
       const { handleServerMessage, setConnected } = useGameStore.getState();
       setConnected(true);
-      handleServerMessage('test-session', {
+      handleServerMessage({
         tag: 'GameStateUpdate',
         contents: makeGameView({ pgvPlayers: [makePlayer({ ppReserved: [] })] }),
       });
-      handleServerMessage('test-session', { tag: 'ErrorMsg', contents: 'err' });
+      handleServerMessage({ tag: 'ErrorMsg', contents: 'err' });
 
       useGameStore.getState().reset();
 
@@ -129,7 +130,7 @@ describe('gameStore', () => {
   describe('GameStateUpdate', () => {
     it('sets gameView', () => {
       const view = makeGameView();
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: view });
       expect(useGameStore.getState().gameView).toBe(view);
     });
 
@@ -138,43 +139,43 @@ describe('gameStore', () => {
       const opponent = makePlayer({ ppPlayerId: 'them', ppReserved: null });
       const view = makeGameView({ pgvPlayers: [opponent, self] });
 
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: view });
       expect(useGameStore.getState().selfPlayerId).toBe('me');
     });
 
     it('does not overwrite selfPlayerId once set', () => {
       const self = makePlayer({ ppPlayerId: 'me', ppReserved: [] });
       const view1 = makeGameView({ pgvPlayers: [self] });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view1 });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
       expect(useGameStore.getState().selfPlayerId).toBe('me');
 
       // Second update where no player has ppReserved (edge case)
       const view2 = makeGameView({ pgvPlayers: [makePlayer({ ppPlayerId: 'me', ppReserved: null })] });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view2 });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
       expect(useGameStore.getState().selfPlayerId).toBe('me');
     });
 
     it('clears gemReturnInfo', () => {
       const options: GemCollection[] = [{ Diamond: 1 }];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GemReturnNeeded', contents: [1, options] });
+      useGameStore.getState().handleServerMessage({ tag: 'GemReturnNeeded', contents: [1, options] });
       expect(useGameStore.getState().gemReturnInfo).not.toBeNull();
 
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: makeGameView() });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
       expect(useGameStore.getState().gemReturnInfo).toBeNull();
     });
 
     it('clears nobleChoices', () => {
       const noble: Noble = { nobleId: 'n1', nobleRequirement: { Diamond: 3 }, noblePrestige: 3 };
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'NobleChoiceRequired', contents: [noble] });
+      useGameStore.getState().handleServerMessage({ tag: 'NobleChoiceRequired', contents: [noble] });
       expect(useGameStore.getState().nobleChoices).not.toBeNull();
 
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: makeGameView() });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
       expect(useGameStore.getState().nobleChoices).toBeNull();
     });
 
     it('clears error', () => {
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ErrorMsg', contents: 'err' });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: makeGameView() });
+      useGameStore.getState().handleServerMessage({ tag: 'ErrorMsg', contents: 'err' });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
       expect(useGameStore.getState().error).toBeNull();
     });
 
@@ -182,10 +183,10 @@ describe('gameStore', () => {
       const actions: Action[] = [
         { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond'] } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
       expect(useGameStore.getState().legalActions).toHaveLength(1);
 
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: makeGameView() });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: makeGameView() });
       expect(useGameStore.getState().legalActions).toEqual([]);
     });
   });
@@ -195,7 +196,7 @@ describe('gameStore', () => {
       const actions: Action[] = [
         { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond', 'Ruby', 'Sapphire'] } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
       expect(useGameStore.getState().legalActions).toBe(actions);
     });
 
@@ -206,8 +207,8 @@ describe('gameStore', () => {
       const actions2: Action[] = [
         { tag: 'ReserveCard', contents: { tag: 'FromTopOfDeck', contents: 'Tier1' } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions1 });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions2 });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions1 });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions2 });
       expect(useGameStore.getState().legalActions).toBe(actions2);
     });
   });
@@ -215,7 +216,7 @@ describe('gameStore', () => {
   describe('GemReturnNeeded', () => {
     it('sets gemReturnInfo with amount and options', () => {
       const options: GemCollection[] = [{ Diamond: 1 }, { Ruby: 1 }];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GemReturnNeeded', contents: [2, options] });
+      useGameStore.getState().handleServerMessage({ tag: 'GemReturnNeeded', contents: [2, options] });
       expect(useGameStore.getState().gemReturnInfo).toEqual({ amount: 2, options });
     });
 
@@ -223,8 +224,8 @@ describe('gameStore', () => {
       const actions: Action[] = [
         { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond'] } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GemReturnNeeded', contents: [1, [{ Diamond: 1 }]] });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
+      useGameStore.getState().handleServerMessage({ tag: 'GemReturnNeeded', contents: [1, [{ Diamond: 1 }]] });
       expect(useGameStore.getState().legalActions).toEqual([]);
     });
   });
@@ -235,7 +236,7 @@ describe('gameStore', () => {
         { nobleId: 'n1', nobleRequirement: { Diamond: 3 }, noblePrestige: 3 },
         { nobleId: 'n2', nobleRequirement: { Ruby: 3 }, noblePrestige: 3 },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'NobleChoiceRequired', contents: nobles });
+      useGameStore.getState().handleServerMessage({ tag: 'NobleChoiceRequired', contents: nobles });
       expect(useGameStore.getState().nobleChoices).toBe(nobles);
     });
 
@@ -243,10 +244,10 @@ describe('gameStore', () => {
       const actions: Action[] = [
         { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond'] } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
 
       const nobles: Noble[] = [{ nobleId: 'n1', nobleRequirement: {}, noblePrestige: 3 }];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'NobleChoiceRequired', contents: nobles });
+      useGameStore.getState().handleServerMessage({ tag: 'NobleChoiceRequired', contents: nobles });
       expect(useGameStore.getState().legalActions).toEqual([]);
     });
   });
@@ -254,7 +255,7 @@ describe('gameStore', () => {
   describe('GameOverMsg', () => {
     it('sets gameResult', () => {
       const result: GameResult = { winnerId: 'p1', winnerName: 'Alice', finalPrestige: 15 };
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameOverMsg', contents: result });
+      useGameStore.getState().handleServerMessage({ tag: 'GameOverMsg', contents: result });
       expect(useGameStore.getState().gameResult).toBe(result);
     });
 
@@ -262,24 +263,24 @@ describe('gameStore', () => {
       const actions: Action[] = [
         { tag: 'TakeGems', contents: { tag: 'TakeDifferent', contents: ['Diamond'] } },
       ];
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ActionRequired', contents: actions });
+      useGameStore.getState().handleServerMessage({ tag: 'ActionRequired', contents: actions });
 
       const result: GameResult = { winnerId: 'p1', winnerName: 'Alice', finalPrestige: 15 };
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameOverMsg', contents: result });
+      useGameStore.getState().handleServerMessage({ tag: 'GameOverMsg', contents: result });
       expect(useGameStore.getState().legalActions).toEqual([]);
     });
   });
 
   describe('ErrorMsg', () => {
     it('sets error string', () => {
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ErrorMsg', contents: 'something broke' });
+      useGameStore.getState().handleServerMessage({ tag: 'ErrorMsg', contents: 'something broke' });
       expect(useGameStore.getState().error).toBe('something broke');
     });
 
     it('does not clear other state', () => {
       const view = makeGameView();
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view });
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'ErrorMsg', contents: 'err' });
+      useGameStore.getState().handleServerMessage({ tag: 'GameStateUpdate', contents: view });
+      useGameStore.getState().handleServerMessage({ tag: 'ErrorMsg', contents: 'err' });
       expect(useGameStore.getState().gameView).toBe(view);
     });
   });
@@ -287,7 +288,7 @@ describe('gameStore', () => {
   describe('Pong', () => {
     it('causes no state change', () => {
       const stateBefore = { ...useGameStore.getState() };
-      useGameStore.getState().handleServerMessage('test-session', { tag: 'Pong' });
+      useGameStore.getState().handleServerMessage({ tag: 'Pong' });
       const stateAfter = useGameStore.getState();
 
       expect(stateAfter.gameView).toBe(stateBefore.gameView);
@@ -321,7 +322,7 @@ describe('gameStore', () => {
         pgvCurrentPlayer: 0,
         pgvTurnNumber: 1,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view1 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
       expect(useGameStore.getState().moveLog).toEqual([]);
 
       // Turn 2: player gained gems since turn 1
@@ -332,7 +333,7 @@ describe('gameStore', () => {
         pgvCurrentPlayer: 0,
         pgvTurnNumber: 2,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view2 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
 
       const log = useGameStore.getState().moveLog;
       expect(log).toHaveLength(1);
@@ -346,14 +347,14 @@ describe('gameStore', () => {
         pgvPlayers: [makePlayer({ ppReserved: [] })],
         pgvTurnNumber: 1,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view1 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
 
       // Second GSU at same turn (e.g. gem return phase)
       const view2 = makeGameView({
         pgvPlayers: [makePlayer({ ppTokens: { Diamond: 1 }, ppReserved: [] })],
         pgvTurnNumber: 1,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view2 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
 
       expect(useGameStore.getState().moveLog).toEqual([]);
     });
@@ -368,7 +369,7 @@ describe('gameStore', () => {
         pgvCurrentPlayer: 0,
         pgvTurnNumber: 1,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view1 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
 
       const view2 = makeGameView({
         pgvPlayers: [
@@ -377,7 +378,7 @@ describe('gameStore', () => {
         pgvCurrentPlayer: 0,
         pgvTurnNumber: 2,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view2 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
 
       const lastMove = useGameStore.getState().lastMove;
       expect(lastMove).not.toBeNull();
@@ -393,13 +394,13 @@ describe('gameStore', () => {
         pgvPlayers: [makePlayer({ ppTokens: {}, ppReserved: [] })],
         pgvTurnNumber: 1,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view1 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view1 });
 
       const view2 = makeGameView({
         pgvPlayers: [makePlayer({ ppTokens: { Ruby: 2 }, ppReserved: [] })],
         pgvTurnNumber: 2,
       });
-      handleServerMessage('test-session', { tag: 'GameStateUpdate', contents: view2 });
+      handleServerMessage({ tag: 'GameStateUpdate', contents: view2 });
 
       expect(useGameStore.getState().moveLog.length).toBeGreaterThan(0);
       expect(useGameStore.getState().lastMove).not.toBeNull();

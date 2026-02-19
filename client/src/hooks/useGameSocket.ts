@@ -18,9 +18,8 @@ export function useGameSocket(
   const connectOne = useCallback((isSpectator: boolean, sid?: string) => {
     if (!gameId || !mountedRef.current) return;
 
-    const key = sid ?? 'spectator';
     const onMessage = (msg: ServerMessage) => {
-      handleMessage(key, msg);
+      handleMessage(msg);
       retriesRef.current = 0;
     };
     const onClose = () => {

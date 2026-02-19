@@ -35,7 +35,7 @@ getGameHandler ss gid sid = do
       case Map.lookup sid (mgSessions mg) of
         Nothing -> throwError err403 { errBody = "Invalid session" }
         Just ps ->
-          let view = toPublicGameView (psPlayerId ps) (mgGameState mg)
+          let view = toPublicGameView (psPlayerId ps) (aiPlayerIds mg) (mgGameState mg)
           in pure view
 
 wsHandler :: ServerState -> GameId -> SessionId -> WS.PendingConnection -> Handler ()

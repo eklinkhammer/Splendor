@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { GameResult } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -23,6 +23,11 @@ export function GameOverOverlay({ result }: Props) {
   const gameView = useGameStore((s) => s.gameView);
   const [playingAgain, setPlayingAgain] = useState(false);
 
+  // Game is over — clear stale gameId so "Resume Game" won't link here
+  useEffect(() => {
+    useSessionStore.getState().setGameId(null);
+  }, []);
+
   const handleReturn = () => {
     resetGame();
     clearSession();
@@ -33,9 +38,7 @@ export function GameOverOverlay({ result }: Props) {
     if (!gameView || !playerName) return;
     setPlayingAgain(true);
     try {
-      // Count AI players (all non-self players are AI in the new model)
-      const selfPlayer = gameView.pgvPlayers.find((p) => p.ppReserved !== null);
-      const aiCount = gameView.pgvPlayers.filter((p) => p.ppPlayerId !== selfPlayer?.ppPlayerId).length;
+      const aiCount = gameView.pgvPlayers.filter((p) => p.ppIsAI).length;
 
       const res = await playAgain(playerName, `${playerName}'s Game`, aiCount);
       resetGame();

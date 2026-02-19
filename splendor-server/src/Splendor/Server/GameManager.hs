@@ -253,11 +253,12 @@ resolveSession sid mg = Map.lookup sid (mgSessions mg)
 broadcastGameState :: ManagedGame -> STM ()
 broadcastGameState mg = do
   let gs = mgGameState mg
+      aiIds = aiPlayerIds mg
   mapM_ (\(sid, chan) ->
     case resolveSession sid mg of
       Nothing -> pure ()
       Just ps -> do
-        let view = toPublicGameView (psPlayerId ps) gs
+        let view = toPublicGameView (psPlayerId ps) aiIds gs
         writeTChan chan (GameStateUpdate view)
         -- If it's this player's turn in AwaitingAction, send legal moves
         case (gsTurnPhase gs, currentPlayer gs) of
@@ -268,7 +269,7 @@ broadcastGameState mg = do
           _ -> pure ()
     ) (Map.toList (mgConnections mg))
   -- Send spectator view (no reserved cards visible)
-  let spectatorView = toSpectatorGameView gs
+  let spectatorView = toSpectatorGameView aiIds gs
   mapM_ (\chan -> writeTChan chan (GameStateUpdate spectatorView))
     (Map.elems (mgSpectators mg))
 

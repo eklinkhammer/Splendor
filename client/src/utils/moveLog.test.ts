@@ -12,6 +12,7 @@ function makePlayer(overrides?: Partial<PublicPlayer>): PublicPlayer {
     ppReserved: null,
     ppNobles: [],
     ppPrestige: 0,
+    ppIsAI: false,
     ...overrides,
   };
 }

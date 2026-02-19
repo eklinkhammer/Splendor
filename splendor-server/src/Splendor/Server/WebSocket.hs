@@ -56,7 +56,7 @@ sendInitialState :: WS.Connection -> TVar ManagedGame -> PlayerSession -> IO ()
 sendInitialState conn gameTVar ps = do
   mg <- atomically $ readTVar gameTVar
   let gs = mgGameState mg
-      view = toPublicGameView (psPlayerId ps) gs
+      view = toPublicGameView (psPlayerId ps) (aiPlayerIds mg) gs
   WS.sendTextData conn (encode (GameStateUpdate view))
   -- If it's this player's turn, send the appropriate prompt
   case (gsTurnPhase gs, currentPlayer gs) of
@@ -136,7 +136,7 @@ handleSpectatorWebSocket gameTVar specId conn = do
   chan <- atomically $ registerSpectator gameTVar specId
   -- Send initial spectator view
   mg <- atomically $ readTVar gameTVar
-  let view = toSpectatorGameView (mgGameState mg)
+  let view = toSpectatorGameView (aiPlayerIds mg) (mgGameState mg)
   WS.sendTextData conn (encode (GameStateUpdate view))
   -- Fork sender and wait for it to start
   started <- newEmptyMVar

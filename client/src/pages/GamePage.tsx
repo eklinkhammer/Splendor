@@ -52,7 +52,7 @@ export function GamePage() {
   useEffect(() => {
     if (id && sessionId && !gameView && !isSpectator) {
       getGame(id, sessionId).then((view) => {
-        useGameStore.getState().handleServerMessage(sessionId, {
+        useGameStore.getState().handleServerMessage({
           tag: 'GameStateUpdate',
           contents: view,
         });
