@@ -16,7 +16,6 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
   const [addingAI, setAddingAI] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const navigate = useNavigate();
   const clearSession = useSessionStore((s) => s.clear);
@@ -102,11 +101,10 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      setCopyFailed(false);
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       copiedTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
-      setCopyFailed(true);
+      // URL is always visible in the input, so clipboard failure is non-critical
     }
   };
 
@@ -166,20 +164,23 @@ export function LobbyDetail({ lobbyId, sessionId }: Props) {
       )}
       {lobby.lobbyStatus.tag === 'Waiting' && (
         <div className="space-y-2">
-          <button
-            onClick={handleCopyInvite}
-            className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            {copied ? 'Copied!' : 'Copy Invite Link'}
-          </button>
-          {copyFailed && (
-            <input
-              readOnly
-              value={`${window.location.origin}/lobby/${lobbyId}`}
-              className="w-full px-3 py-2 bg-gray-700 text-gray-300 text-sm rounded border border-gray-600 select-all"
-              onFocus={(e) => e.target.select()}
-            />
-          )}
+          <div>
+            <h3 className="text-sm font-medium text-gray-400 mb-1">Invite Friends</h3>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={`${window.location.origin}/lobby/${lobbyId}`}
+                className="flex-1 px-3 py-2 bg-gray-700 text-gray-300 text-sm rounded border border-gray-600"
+                onFocus={(e) => e.target.select()}
+              />
+              <button
+                onClick={handleCopyInvite}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
           {canAddMore && (
             <button
               onClick={handleAddAI}
