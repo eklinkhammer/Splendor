@@ -3,6 +3,7 @@ module Splendor.Server.App
   , mkApp
   ) where
 
+import Control.Concurrent (forkIO)
 import Data.Text qualified as T
 import Data.Text.IO qualified as TIO
 import Network.Wai (Application, Middleware)
@@ -12,6 +13,7 @@ import Servant (serve)
 
 import Splendor.Server.API (splendorAPI, splendorServer)
 import Splendor.Server.Config (Config(..), loadConfig)
+import Splendor.Server.LobbyCleanup (lobbyCleanupThread)
 import Splendor.Server.Persistence (initPersistence)
 import Splendor.Server.Persistence.Schema (initSchema)
 import Splendor.Server.Restore (restoreGames)
@@ -27,6 +29,7 @@ runServer = do
   initSchema persistence
   ss <- newServerState persistence
   restoreGames ss
+  _ <- forkIO (lobbyCleanupThread ss)
   let port = configPort config
   TIO.putStrLn $ "Splendor server starting on port " <> T.pack (show port)
   Warp.run port

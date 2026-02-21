@@ -31,6 +31,7 @@ library
     Splendor.Server.AIRunner
     Splendor.Server.WebSocket
     Splendor.Server.GameManager
+    Splendor.Server.LobbyCleanup
     Splendor.Server.Persistence
     Splendor.Server.Persistence.Handle
     Splendor.Server.Persistence.Schema
